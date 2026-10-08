@@ -1,0 +1,16 @@
+{
+  "judge_rows": 7281,
+  "applications": 509,
+  "judge_ids": {
+    "Reviewer Email Address": 596,
+    "reviewer_name": 544,
+    "Contact ID - 18 Digit": 540
+  },
+  "duplicate_summary": {
+    "repeated_application_reviewer_groups": 0,
+    "extra_application_reviewer_rows": 0,
+    "repeated_application_preferred_judge_groups": 2,
+    "extra_preferred_judge_rows": 2,
+    "exactish_duplicate_rows": 0
+  }
+}

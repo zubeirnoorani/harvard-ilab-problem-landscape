@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A demand-side research atlas of the customer problems Harvard entrepreneurs chose to solve from 2021 to 2024." />
+    <title>Harvard i-lab Problem Landscape</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="top-rule"></div>
+    <header class="site-header shell">
+      <a class="wordmark" href="#overview" aria-label="Harvard i-lab problem landscape home">
+        <span class="shield">H</span>
+        <span><b>Harvard Innovation Labs</b><small>Problem Landscape · Research Atlas</small></span>
+      </a>
+      <nav aria-label="Dashboard sections">
+        <a href="#landscape">Landscape</a>
+        <a href="#profile">Problem profile</a>
+        <a href="#tracks">Tracks</a>
+        <a href="#founders">Founders</a>
+        <a href="#judges">Judges</a>
+        <a href="#method">Method</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero shell" id="overview">
+        <div class="hero-copy">
+          <p class="kicker">President’s Innovation Challenge · 2021–2024</p>
+          <h1>The problem<br /><em>comes first.</em></h1>
+          <p class="lede">A demand-side atlas of the customer needs, frictions, and contexts Harvard entrepreneurs choose to address—before technology, product, or judging outcomes enter the picture.</p>
+        </div>
+        <aside class="evidence-index" aria-label="Dataset summary">
+          <p class="index-title">Evidence index</p>
+          <dl>
+            <div><dt>Judge-level rows</dt><dd id="hero-judge-rows">—</dd></div>
+            <div><dt>Applications</dt><dd id="hero-applications">—</dd></div>
+            <div><dt>Usable problem texts</dt><dd id="hero-eligible">—</dd></div>
+            <div><dt>Competition years</dt><dd>4</dd></div>
+          </dl>
+          <p class="privacy-stamp"><span>Disclosure controlled</span> Aggregate cells below 10 observations are suppressed.</p>
+        </aside>
+      </section>
+
+      <section class="atlas-band" aria-label="Problem prevalence ribbon">
+        <div class="shell">
+          <div class="band-head">
+            <div><span class="kicker light">Attention ribbon</span><strong id="ribbon-title">Primary portfolio share</strong></div>
+            <p id="ribbon-note">Width shows the share of ventures primarily assigned to each displayed problem area.</p>
+          </div>
+          <div id="concept-ribbon" class="concept-ribbon"></div>
+          <div id="ribbon-legend" class="ribbon-legend"></div>
+        </div>
+      </section>
+
+      <section class="control-dock" aria-label="Global dashboard controls">
+        <div class="shell controls-grid">
+          <fieldset>
+            <legend>Concept granularity</legend>
+            <div class="segmented" id="model-control">
+              <button type="button" data-model="16" class="active">16 concepts</button>
+              <button type="button" data-model="32">32 concepts</button>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Membership view</legend>
+            <div class="segmented" id="membership-control">
+              <button type="button" data-membership="primary" class="active">Primary areas</button>
+              <button type="button" data-membership="active">Overlapping concepts</button>
+            </div>
+          </fieldset>
+          <label>Competition track<select id="scope-control"><option>All tracks</option><option>Open</option><option>Social Impact</option><option>Health &amp; Life Sciences</option></select></label>
+          <label>Year<select id="year-control"><option>All years</option><option>2021</option><option>2022</option><option>2023</option><option>2024</option></select></label>
+          <div class="control-readout"><span id="control-visible">—</span><small>displayed problem areas</small></div>
+        </div>
+      </section>
+
+      <section class="signals shell" aria-labelledby="signals-title">
+        <div class="section-heading compact">
+          <p class="kicker">Portfolio signals</p>
+          <h2 id="signals-title">What deserves a closer look?</h2>
+        </div>
+        <div class="finding-grid" id="finding-grid"></div>
+      </section>
+
+      <section class="dark-section" id="landscape" aria-labelledby="landscape-title">
+        <div class="shell">
+          <div class="section-heading split light-heading">
+            <div><p class="kicker light">01 · Problem landscape</p><h2 id="landscape-title">Attention × evaluation</h2></div>
+            <p id="landscape-description">Bubble size shows venture count. Position compares mean startup Recommendation with change in entrepreneurial attention.</p>
+          </div>
+          <div class="chart-frame">
+            <div class="chart-meta"><span><i class="legend-dot"></i> Click a problem area to update its profile</span><span id="chart-scope-label">—</span></div>
+            <div id="landscape-chart" class="svg-chart" role="img" aria-label="Problem landscape chart"></div>
+          </div>
+          <div class="table-head"><h3>Problem-area evidence</h3><p>Startup-weighted outcomes; between-startup SD is distinct from within-startup judge disagreement.</p></div>
+          <div class="table-wrap"><table id="landscape-table"><thead><tr><th>Problem area</th><th>N</th><th>Share</th><th>Recommendation</th><th>Between-startup SD</th><th>Median</th><th>Judge ratings</th><th id="table-change-heading">Trend / year</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+
+      <section class="profile-section shell" id="profile" aria-labelledby="profile-heading">
+        <div class="section-heading split">
+          <div><p class="kicker">02 · Explore a problem</p><h2 id="profile-heading">Problem profile</h2></div>
+          <label class="concept-picker">Select a concept<select id="concept-control"></select></label>
+        </div>
+        <article class="profile-hero">
+          <div class="profile-copy"><span id="profile-code" class="concept-code">—</span><h3 id="profile-title">—</h3><p id="profile-description">—</p><div id="profile-badges" class="badge-row"></div></div>
+          <dl class="profile-metrics" id="profile-metrics"></dl>
+        </article>
+        <div class="profile-grid">
+          <article class="panel score-panel"><div class="panel-head"><div><span>Judging dimensions</span><h3>Where might i-lab help?</h3></div><span id="support-pattern" class="status-pill">—</span></div><div id="score-bars" class="score-bars"></div><p id="support-note" class="panel-note">—</p></article>
+          <article class="panel"><div class="panel-head"><div><span>2021–2024</span><h3>Attention over time</h3></div><strong id="trend-value">—</strong></div><div id="trend-chart" class="mini-chart"></div><p class="panel-note">Exact yearly cells below 10 ventures are hidden; the four-year slope remains descriptive.</p></article>
+          <article class="panel span-two"><div class="panel-head"><div><span>Portfolio composition</span><h3>Who and where</h3></div><span>Displayed cells N ≥ 10</span></div><div id="composition-grid" class="composition-grid"></div></article>
+          <article class="panel"><div class="panel-head"><div><span>Concept structure</span><h3>Related problems</h3></div><span>Active-feature overlap</span></div><div id="related-list" class="related-list"></div></article>
+          <article class="panel"><div class="panel-head"><div><span>Judge perspective</span><h3>Ratings by judge type</h3></div><span>Not causal</span></div><div id="judge-type-list" class="judge-type-list"></div></article>
+        </div>
+      </section>
+
+      <section class="track-section" id="tracks" aria-labelledby="tracks-heading">
+        <div class="shell">
+          <div class="section-heading split"><div><p class="kicker">03 · Track comparison</p><h2 id="tracks-heading">Three programs, three portfolios</h2></div><p>Each card is calculated within its own track, using the selected granularity, membership view, and year.</p></div>
+          <div id="track-cards" class="track-cards"></div>
+          <div class="table-head"><h3>Problem share by track</h3><p>Blank or marked cells are suppressed because fewer than 10 ventures contribute.</p></div>
+          <div class="table-wrap"><table id="track-table"><thead><tr><th>Problem area</th><th>Open</th><th>Social Impact</th><th>Health &amp; Life Sciences</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+
+      <section class="founder-section shell" id="founders" aria-labelledby="founders-heading">
+        <div class="section-heading split"><div><p class="kicker">04 · Founder landscape</p><h2 id="founders-heading">Representation by problem</h2></div><p>Only supplied demographic fields are used. Gender is never inferred from names. Founder cells below 10 are suppressed.</p></div>
+        <div class="founder-grid">
+          <article class="panel span-two"><div class="panel-head"><div><span>Priority view</span><h3>Gender × problem area</h3></div><span>Founder counts</span></div><div id="gender-matrix" class="matrix-list"></div></article>
+          <article class="panel span-two"><div class="panel-head"><div><span>Priority view</span><h3>Harvard school × problem area</h3></div><span>Darker = more founders</span></div><div id="school-matrix" class="heatmap-wrap"></div></article>
+          <article class="panel"><div class="panel-head"><div><span>Geography</span><h3>Visible country cells</h3></div></div><div id="country-summary" class="rank-list"></div></article>
+          <article class="panel"><div class="panel-head"><div><span>Industry</span><h3>Visible industry cells</h3></div></div><div id="industry-summary" class="rank-list"></div></article>
+        </div>
+      </section>
+
+      <section class="judge-section" id="judges" aria-labelledby="judges-heading">
+        <div class="shell">
+          <div class="section-heading split light-heading"><div><p class="kicker light">05 · Judge evaluation</p><h2 id="judges-heading">Consensus, disagreement, and perspective</h2></div><p>Each startup contributes its own mean and within-startup SD. Startups with more judges do not receive greater portfolio weight.</p></div>
+          <div class="judge-grid">
+            <article class="chart-frame"><div class="chart-meta"><span>Recommendation × within-startup disagreement</span><span id="judge-scope-label">—</span></div><div id="disagreement-chart" class="svg-chart small" role="img" aria-label="Judge disagreement chart"></div></article>
+            <article class="polarizing-list"><div class="panel-head inverse"><div><span>Highest disagreement</span><h3>Most polarizing problem areas</h3></div></div><div id="polarizing-list"></div></article>
+          </div>
+          <div class="table-head inverse"><h3>Judge-type detail for selected concept</h3><p>Centered ratings adjust descriptively for year and track averages; they are not causal estimates.</p></div>
+          <div class="table-wrap dark-table"><table id="judge-table"><thead><tr><th>Judge type</th><th>Mean</th><th>SD</th><th>Median</th><th>Ratings</th><th>Startups</th><th>Year/track-centered</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+
+      <section class="method-section" id="method" aria-labelledby="method-heading">
+        <div class="shell">
+          <div class="section-heading split"><div><p class="kicker">06 · Data & methodology</p><h2 id="method-heading">From judge rows to a problem atlas</h2></div><p>The concept taxonomy is learned from demand-side application text alone. Judging outcomes are attached only after representation learning.</p></div>
+          <ol class="pipeline-steps">
+            <li><span>1</span><div><h3>Audit and reconcile</h3><p>Identify application and judge keys, exclude conflicts of interest, reconcile duplicate judge identities, and validate track-specific forms.</p></div></li>
+            <li><span>2</span><div><h3>Aggregate to applications</h3><p>Calculate startup-level Recommendation and dimension means, medians, SDs, and judge counts before any portfolio analysis.</p></div></li>
+            <li><span>3</span><div><h3>Construct problem text</h3><p>Use customer, stakeholder, context, and unmet-need fields. Do not backfill missing records with solution or pitch text.</p></div></li>
+            <li><span>4</span><div><h3>Learn overlapping concepts</h3><p>Embed locally and train the pinned HypotheSAEs implementation at M=16 and M=32, K=4, independently of outcomes.</p></div></li>
+            <li><span>5</span><div><h3>Validate and overlay</h3><p>Review every concept, compare three seeds, then attach trends, judges, founders, schools, geography, and industry.</p></div></li>
+          </ol>
+          <div id="model-cards" class="model-cards"></div>
+          <div class="table-head"><h3>Data coverage</h3><p>Usable problem text reflects structured demand-side fields, not generic venture descriptions.</p></div>
+          <div class="table-wrap"><table id="coverage-table"><thead><tr><th>Year</th><th>Track</th><th>Applications</th><th>Judge rows</th><th>Usable problem text</th><th>Missing</th></tr></thead><tbody></tbody></table></div>
+          <div class="method-notes">
+            <div><span>Customer problem fields</span><p><b>HLS:</b> <code>problem HLS</code> + <code>stakeholders</code><br /><b>Open / Social Impact:</b> <code>Problem</code> + <code>Customer</code></p></div>
+            <div><span>Interpretation</span><p>SAE features overlap. “Primary area” is the highest relevant activation and exists only for views needing one area per startup.</p></div>
+            <div><span>Privacy boundary</span><p>Representative application excerpts, venture identities, row-level founder data, embeddings, activations, and checkpoints remain in the protected local research environment.</p></div>
+          </div>
+          <p class="audit-foot" id="audit-foot"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="shell"><span>Harvard i-lab Problem Landscape</span><span>Aggregate research prototype · Descriptive, not causal</span></footer>
+    <div id="tooltip" class="tooltip" hidden></div>
+    <script src="app.js" defer></script>
+  </body>
+</html>

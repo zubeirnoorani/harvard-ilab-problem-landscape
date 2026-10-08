@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harvard-ilab-problem-landscape"
+version = "0.1.0"
+description = "Demand-side problem landscape prototype for Harvard Innovation Labs PIC applications."
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "pandas>=2.2,<3",
+  "numpy>=1.26,<3",
+  "scipy>=1.12,<2",
+  "scikit-learn>=1.4,<2",
+  "statsmodels>=0.14,<1",
+  "matplotlib>=3.8,<4",
+  "plotly>=5.24,<7",
+  "kaleido>=0.2.1",
+  "streamlit>=1.40,<2",
+  "jupyter>=1.1,<2",
+  "nbformat>=5.10,<6",
+  "pytest>=8,<9",
+  "tabulate>=0.9,<1",
+]
+
+[project.optional-dependencies]
+sae = [
+  "accelerate>=1.0",
+  "jmespath>=1.0",
+  "openai>=2.0",
+  "sentence-transformers>=5.0",
+  "tiktoken>=0.10",
+  "torch>=2.6",
+  "tqdm>=4.60",
+  "transformers>=4.50",
+  "hypothesaes @ git+https://github.com/rmovva/HypotheSAEs.git@706d8979c71befe8e3151f51a8d4dbf87d4d7e41 ; python_version < '3.14'",
+]
+
+[project.scripts]
+ilab-landscape = "src.pipeline:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools]
+packages = ["src"]

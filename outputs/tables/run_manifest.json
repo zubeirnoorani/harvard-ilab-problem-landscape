@@ -1,0 +1,28 @@
+{
+  "created_at_utc": "2026-10-08T00:50:53.187241+00:00",
+  "python": "3.14.0",
+  "packages": {
+    "pandas": "2.3.3",
+    "numpy": "2.5.3",
+    "scikit-learn": "1.9.1",
+    "torch": "2.14.1",
+    "sentence-transformers": "6.1.0",
+    "streamlit": "1.65.0"
+  },
+  "source_sha256": "69c7a3b28cc634cb05d9a810570c9cfdf9bdcfbcaf99430d78a79d2dbc5f8ed9",
+  "judge_rows": 7281,
+  "applications": 509,
+  "eligible_problem_texts": 459,
+  "hypothesaes_commit": "706d8979c71befe8e3151f51a8d4dbf87d4d7e41",
+  "embedding_model": "nomic-ai/modernbert-embed-base",
+  "sae": {
+    "m": [
+      16,
+      32
+    ],
+    "k": 4,
+    "seed": 42
+  },
+  "taxonomy_uses_judging_outcomes": false,
+  "raw_data_committed": false
+}

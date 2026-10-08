@@ -1,0 +1,35 @@
+# Confidential source and row-level derivatives
+data/*.csv
+outputs/tables/*.csv
+outputs/cluster_examples/**
+outputs/profiles/**
+
+# Model artifacts derived from confidential text
+artifacts/**
+!artifacts/.gitkeep
+external/HypotheSAEs/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Python / notebooks / tests
+.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Generated visualizations may contain confidential labels/examples
+outputs/figures/*.html
+outputs/figures/*.png
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+.vercel/
