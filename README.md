@@ -71,6 +71,8 @@ The reproduced pipeline has no per-call API cost: embeddings run locally, the SA
 
 Raw data, row-level derivatives, problem excerpts, embeddings, activations, checkpoints, and LLM caches remain local and gitignored. Aggregate Markdown findings should be reviewed for small-cell disclosure before sharing. Do not infer gender from names; use only supplied fields.
 
+The public repository contains reproducible code, empty notebooks, disclosure-controlled aggregate reports, and a hosted payload whose analytical cells satisfy N ≥ 10. Access to the confidential source export is still required to reproduce the private row-level and model artifacts locally.
+
 ## Known limitations
 
 - Fifty 2021 applications lack structured problem/customer fields and are not backfilled from solution-heavy descriptions.
