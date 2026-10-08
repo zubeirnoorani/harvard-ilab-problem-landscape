@@ -207,6 +207,17 @@ def create_audit_outputs(df: pd.DataFrame, output_dir: Path = PATHS.tables) -> d
     inferred_form = np.where(hls_strength >= general_strength, "hls", "open_social")
     expected_form = np.where(app["Track"].eq("Health & Life Science"), "hls", "open_social")
     form_mismatch = structured_available & (inferred_form != expected_form)
+    structured_coverage = (
+        app.assign(usable_problem_text=structured_available)
+        .groupby(["year", "Track"], as_index=False)
+        .agg(
+            applications_total=("Submission ID", "nunique"),
+            usable_problem_text=("usable_problem_text", "sum"),
+        )
+    )
+    structured_coverage["coverage_share"] = (
+        structured_coverage["usable_problem_text"] / structured_coverage["applications_total"]
+    )
     conflict_rows = int(df.get("I have a conflict of interest:", pd.Series("", index=df.index)).eq("1").sum())
 
     stable_columns = [
@@ -277,6 +288,12 @@ def create_audit_outputs(df: pd.DataFrame, output_dir: Path = PATHS.tables) -> d
         "- Structured problem/customer field coverage varies by form family and year; see `application_field_coverage.csv`.",
         "- Field availability by year and track is explicitly tabulated in `application_field_coverage.csv`; the structured application form changes materially after 2021.",
         "- The source contains direct identifiers and free text. All row-level outputs remain local and gitignored.",
+        "",
+        "## Structured problem-text coverage and longitudinal comparability",
+        "",
+        "2021 has partial structured problem-text coverage (62 of 112 applications) and is preserved as historical context, not treated as fully comparable with 2022–2024. Default growth and decline metrics therefore use 2022–2024; four-year metrics are explicitly labeled partial coverage.",
+        "",
+        structured_coverage.to_markdown(index=False),
         "",
         "## Year and track counts",
         "",

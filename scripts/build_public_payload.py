@@ -8,6 +8,7 @@ activations, checkpoints, and example excerpts never enter the hosted payload.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,12 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.analysis import concept_quality_badge  # noqa: E402
+from src.public_privacy import assert_public_privacy  # noqa: E402
+
 TABLES = ROOT / "outputs" / "tables"
 OUTPUT = ROOT / "vercel-site" / "data" / "landscape.json"
 MIN_CELL = 10
@@ -55,7 +62,14 @@ def outcome_record(row: pd.Series, trend: pd.Series | None = None) -> dict[str, 
         "recommendation": clean_number(row["recommendation_mean"]),
         "recommendationSd": clean_number(row["recommendation_sd_between_startups"]),
         "recommendationMedian": clean_number(row["recommendation_median"]),
-        "recommendationStartups": clean_number(row["recommendation_n_startups"]),
+        "recommendationApplications": clean_number(row["recommendation_n_startups"]),
+        "recommendationCiLow": clean_number(row["recommendation_ci_low"]),
+        "recommendationCiHigh": clean_number(row["recommendation_ci_high"]),
+        "adjustedRecommendation": clean_number(row["recommendation_adjusted_year_track_mean"]),
+        "adjustedRecommendationSd": clean_number(row["recommendation_adjusted_year_track_sd_between_applications"]),
+        "adjustedRecommendationApplications": clean_number(row["recommendation_adjusted_year_track_n_applications"]),
+        "adjustedRecommendationCiLow": clean_number(row["recommendation_adjusted_year_track_ci_low"]),
+        "adjustedRecommendationCiHigh": clean_number(row["recommendation_adjusted_year_track_ci_high"]),
         "ratings": clean_number(row["recommendation_n_ratings"]),
         "problem": clean_number(row["problem_customer_definition_mean"]),
         "problemSd": clean_number(row["problem_customer_definition_sd_between_startups"]),
@@ -67,10 +81,22 @@ def outcome_record(row: pd.Series, trend: pd.Series | None = None) -> dict[str, 
         "impactSd": clean_number(row["impact_sd_between_startups"]),
         "trend": None,
         "change": None,
+        "trend2022To2024": None,
+        "change2022To2024": None,
+        "trend2021To2024Partial": None,
+        "change2021To2024Partial": None,
+        "trendHeadlineEligible": False,
     }
     if trend is not None:
-        record["trend"] = clean_number(trend["trend_slope_share_per_year"])
-        record["change"] = clean_number(trend["change_2021_to_2024"])
+        record["trend"] = clean_number(trend["trend_slope_2022_2024"])
+        record["change"] = clean_number(trend["change_2022_to_2024"])
+        record["trend2022To2024"] = clean_number(trend["trend_slope_2022_2024"])
+        record["change2022To2024"] = clean_number(trend["change_2022_to_2024"])
+        record["trend2021To2024Partial"] = clean_number(trend["trend_slope_2021_2024_partial"])
+        record["change2021To2024Partial"] = clean_number(trend["change_2021_to_2024_partial"])
+        record["trendHeadlineEligible"] = bool(
+            int(trend["count_2022"]) >= MIN_CELL and int(trend["count_2024"]) >= MIN_CELL
+        )
     return record
 
 
@@ -138,7 +164,8 @@ def build_profiles(m: int, concepts: pd.DataFrame, slices: dict[str, Any]) -> di
     compositions = {
         "tracks": (pd.read_csv(TABLES / f"composition_Track_m{m}.csv"), "Track", "n_startups"),
         "years": (pd.read_csv(TABLES / f"composition_year_m{m}.csv"), "year", "n_startups"),
-        "gender": (pd.read_csv(TABLES / f"composition_gender_m{m}.csv"), "gender", "n_founders"),
+        "leadGender": (pd.read_csv(TABLES / f"lead_gender_composition_m{m}.csv"), "lead_gender", "n_applications"),
+        "teamGender": (pd.read_csv(TABLES / f"team_gender_composition_m{m}.csv"), "gender", "n_founders"),
         "schools": (
             pd.read_csv(TABLES / f"composition_harvard_school_m{m}.csv"),
             "harvard_school",
@@ -155,6 +182,8 @@ def build_profiles(m: int, concepts: pd.DataFrame, slices: dict[str, Any]) -> di
     judge_types = pd.read_csv(TABLES / f"judge_type_m{m}.csv")
     intervention = pd.read_csv(TABLES / f"intervention_profiles_m{m}.csv").set_index("concept_id")
     trends = pd.read_csv(TABLES / f"trends_m{m}.csv")
+    track_index = pd.read_csv(TABLES / f"track_overrepresentation_m{m}.csv")
+    school_index = pd.read_csv(TABLES / f"school_representation_m{m}.csv")
     label_map = concepts.set_index("id")["label"].to_dict()
     primary_all = {item["id"]: item for item in slices["primary"]["All tracks"]["All years"]["items"]}
     active_all = {item["id"]: item for item in slices["active"]["All tracks"]["All years"]["items"]}
@@ -195,7 +224,7 @@ def build_profiles(m: int, concepts: pd.DataFrame, slices: dict[str, Any]) -> di
                 "sd": clean_number(row["recommendation_sd"]),
                 "median": clean_number(row["recommendation_median"]),
                 "ratings": int(row["n_ratings"]),
-                "startups": int(row["n_startups"]),
+                "applications": int(row["n_startups"]),
                 "adjustedMean": clean_number(row["mean_year_track_centered_rating"]),
             }
             for _, row in jt.sort_values("recommendation_mean", ascending=False).iterrows()
@@ -213,8 +242,13 @@ def build_profiles(m: int, concepts: pd.DataFrame, slices: dict[str, Any]) -> di
                 "businessZ": clean_number(row["business_model_z"]),
                 "impactZ": clean_number(row["impact_z"]),
                 "problemMinusBusiness": clean_number(row["problem_minus_business"]),
+                "problemMinusPrototype": clean_number(row["problem_minus_prototype"]),
                 "prototypeMinusProblem": clean_number(row["prototype_minus_problem"]),
                 "impactMinusBusiness": clean_number(row["impact_minus_business"]),
+                "problem": clean_number(row["problem_customer_definition_mean_mean"]),
+                "solution": clean_number(row["solution_prototype_mean_mean"]),
+                "business": clean_number(row["business_model_mean_mean"]),
+                "impact": clean_number(row["impact_mean_mean"]),
             }
 
         trend_row = trends[(trends["track_scope"] == "All tracks") & (trends["concept_id"] == cid)]
@@ -230,19 +264,53 @@ def build_profiles(m: int, concepts: pd.DataFrame, slices: dict[str, Any]) -> di
                         "n": count if count >= MIN_CELL else None,
                         "share": clean_number(row[f"share_{year}"]) if count >= MIN_CELL else None,
                         "suppressed": count < MIN_CELL,
+                        "coverage": "partial" if year == 2021 else "complete",
+                        "coverageLabel": "Partial problem-text coverage" if year == 2021 else "Effectively complete problem-text coverage",
                     }
                 )
             trend_record = {
-                "slope": clean_number(row["trend_slope_share_per_year"]),
-                "change": clean_number(row["change_2021_to_2024"]),
+                "slope": clean_number(row["trend_slope_2022_2024"]),
+                "change": clean_number(row["change_2022_to_2024"]),
+                "slope2022To2024": clean_number(row["trend_slope_2022_2024"]),
+                "change2022To2024": clean_number(row["change_2022_to_2024"]),
+                "slope2021To2024Partial": clean_number(row["trend_slope_2021_2024_partial"]),
+                "change2021To2024Partial": clean_number(row["change_2021_to_2024_partial"]),
                 "years": year_values,
             }
+
+        track_records = [
+            {
+                "track": clean_label(row["Track"]),
+                "n": int(row["n_applications"]),
+                "trackShare": clean_number(row["track_share"]),
+                "overallShare": clean_number(row["overall_share"]),
+                "ratio": clean_number(row["overrepresentation_ratio"]),
+                "shareDifference": clean_number(row["share_difference"]),
+            }
+            for _, row in track_index.loc[
+                track_index["concept_id"].eq(cid) & track_index["n_applications"].ge(MIN_CELL)
+            ].sort_values("overrepresentation_ratio", ascending=False).iterrows()
+        ]
+        school_records = [
+            {
+                "school": clean_label(row["harvard_school"]),
+                "n": int(row["n_founders"]),
+                "representationIndex": clean_number(row["representation_index"]),
+                "problemShare": clean_number(row["share_of_problem_from_school"]),
+                "portfolioShare": clean_number(row["share_of_all_reported_founders_from_school"]),
+            }
+            for _, row in school_index.loc[
+                school_index["concept_id"].eq(cid) & school_index["n_founders"].ge(MIN_CELL)
+            ].sort_values("representation_index", ascending=False).iterrows()
+        ]
 
         profiles[str(cid)] = {
             "primaryOutcome": primary,
             "activeOutcome": active_all.get(cid),
             "support": support,
             "trend": trend_record,
+            "trackOverrepresentation": track_records,
+            "schoolRepresentation": school_records,
             "compositions": {
                 name: safe_composition(frame, cid, category, count)
                 for name, (frame, category, count) in compositions.items()
@@ -261,6 +329,7 @@ def build_concepts(m: int) -> pd.DataFrame:
         cid = int(row["concept_id"])
         stable = stability.loc[cid]
         primary_n = int(stable["n_primary_assignments"])
+        quality_badge = concept_quality_badge(stable, row)
         rows.append(
             {
                 "id": cid,
@@ -272,6 +341,7 @@ def build_concepts(m: int) -> pd.DataFrame:
                 "primaryN": primary_n if primary_n >= MIN_CELL else None,
                 "primarySuppressed": primary_n < MIN_CELL,
                 "qualityNote": str(row["problem_quality_notes"]),
+                "qualityBadge": quality_badge,
                 "labelStatus": str(row["label_status"]),
                 "stability": str(stable["stability_flag"]),
                 "activationCorrelation": clean_number(stable["mean_matched_activation_correlation"]),
@@ -286,22 +356,47 @@ def build_concepts(m: int) -> pd.DataFrame:
 def build_founder_matrix(m: int) -> dict[str, Any]:
     result: dict[str, Any] = {}
     specs = {
-        "gender": ("composition_gender", "gender"),
-        "schools": ("composition_harvard_school", "harvard_school"),
+        "teamGender": ("team_gender_composition", "gender", "n_founders"),
+        "leadGender": ("lead_gender_composition", "lead_gender", "n_applications"),
+        "schoolCounts": ("composition_harvard_school", "harvard_school", "n_founders"),
         "countries": ("composition_country", "country"),
     }
-    for name, (file_stem, category) in specs.items():
+    for name, spec in specs.items():
+        file_stem, category = spec[:2]
+        count_col = spec[2] if len(spec) == 3 else "n_founders"
         data = pd.read_csv(TABLES / f"{file_stem}_m{m}.csv")
-        safe = data[data["n_founders"] >= MIN_CELL].copy()
+        safe = data[data[count_col] >= MIN_CELL].copy()
         result[name] = [
             {
                 "conceptId": int(row["concept_id"]),
                 "conceptLabel": str(row["concept_label"]),
                 "category": clean_label(row[category]),
-                "n": int(row["n_founders"]),
+                "n": int(row[count_col]),
+                **(
+                    {
+                        "reportingCoverage": clean_number(row["reporting_coverage"]),
+                        "shareAmongReported": clean_number(row["share_among_reported"]),
+                    }
+                    if "reporting_coverage" in row.index
+                    else {}
+                ),
             }
             for _, row in safe.iterrows()
         ]
+    school_index = pd.read_csv(TABLES / f"school_representation_m{m}.csv")
+    school_index = school_index[school_index["n_founders"] >= MIN_CELL]
+    result["schoolRepresentation"] = [
+        {
+            "conceptId": int(row["concept_id"]),
+            "conceptLabel": str(row["concept_label"]),
+            "category": clean_label(row["harvard_school"]),
+            "n": int(row["n_founders"]),
+            "representationIndex": clean_number(row["representation_index"]),
+            "problemShare": clean_number(row["share_of_problem_from_school"]),
+            "portfolioShare": clean_number(row["share_of_all_reported_founders_from_school"]),
+        }
+        for _, row in school_index.iterrows()
+    ]
     industry = pd.read_csv(TABLES / f"composition_industry_primary_m{m}.csv")
     industry = industry[industry["n_startups"] >= MIN_CELL]
     result["industries"] = [
@@ -313,6 +408,26 @@ def build_founder_matrix(m: int) -> dict[str, Any]:
         }
         for _, row in industry.iterrows()
     ]
+    lead = pd.read_csv(TABLES / f"lead_gender_composition_m{m}.csv")
+    team = pd.read_csv(TABLES / f"team_gender_composition_m{m}.csv")
+    lead_totals = lead.drop_duplicates("concept_id")
+    team_totals = team.drop_duplicates("concept_id")
+    result["genderCoverage"] = {
+        "lead": {
+            "reported": int(lead_totals["reported_lead_gender_n"].sum()),
+            "total": int(lead_totals["problem_n_applications"].sum()),
+            "coverage": clean_number(
+                lead_totals["reported_lead_gender_n"].sum() / lead_totals["problem_n_applications"].sum()
+            ),
+        },
+        "team": {
+            "reported": int(team_totals["team_gender_reported_n"].sum()),
+            "total": int(team_totals["team_records_total"].sum()),
+            "coverage": clean_number(
+                team_totals["team_gender_reported_n"].sum() / team_totals["team_records_total"].sum()
+            ),
+        },
+    }
     return result
 
 
@@ -326,8 +441,8 @@ def build_disagreement(m: int) -> dict[str, Any]:
                 "id": int(row["concept_id"]),
                 "label": str(row["concept_label"]),
                 "recommendation": clean_number(row["recommendation_mean"]),
-                "meanWithinStartupSd": clean_number(row["mean_within_startup_recommendation_sd"]),
-                "medianWithinStartupSd": clean_number(row["median_within_startup_recommendation_sd"]),
+                "meanWithinApplicationSd": clean_number(row["mean_within_startup_recommendation_sd"]),
+                "medianWithinApplicationSd": clean_number(row["median_within_startup_recommendation_sd"]),
                 "n": int(row["n_startups"]),
                 "ratings": int(row["n_underlying_ratings"]),
                 "quadrant": str(row["rating_disagreement_quadrant"]),
@@ -335,6 +450,55 @@ def build_disagreement(m: int) -> dict[str, Any]:
             for _, row in rows.iterrows()
         ]
     return result
+
+
+def build_track_signatures(m: int, concepts: pd.DataFrame) -> dict[str, Any]:
+    data = pd.read_csv(TABLES / f"track_overrepresentation_m{m}.csv")
+    quality = concepts.set_index("id")
+    result: dict[str, Any] = {}
+    for display, (_, raw_track, _) in SCOPE_MAP.items():
+        if raw_track is None:
+            continue
+        rows = data.loc[data["Track"].eq(raw_track) & data["n_applications"].ge(MIN_CELL)].copy()
+        rows = rows.loc[
+            rows["concept_id"].map(lambda cid: quality.loc[int(cid), "qualityBadge"] in {"Stable", "Stable but broad"})
+        ]
+        result[display] = [
+            {
+                "id": int(row["concept_id"]),
+                "label": str(row["concept_label"]),
+                "n": int(row["n_applications"]),
+                "trackShare": clean_number(row["track_share"]),
+                "overallShare": clean_number(row["overall_share"]),
+                "ratio": clean_number(row["overrepresentation_ratio"]),
+                "shareDifference": clean_number(row["share_difference"]),
+            }
+            for _, row in rows.sort_values(
+                ["overrepresentation_ratio", "n_applications"], ascending=False
+            ).head(4).iterrows()
+        ]
+    return result
+
+
+def build_support_portfolio(m: int) -> list[dict[str, Any]]:
+    data = pd.read_csv(TABLES / f"intervention_profiles_m{m}.csv")
+    safe = data.loc[data["n_startups"].ge(MIN_CELL)].copy()
+    return [
+        {
+            "id": int(row["concept_id"]),
+            "label": str(row["concept_label"]),
+            "n": int(row["n_startups"]),
+            "problem": clean_number(row["problem_customer_definition_mean_mean"]),
+            "solution": clean_number(row["solution_prototype_mean_mean"]),
+            "business": clean_number(row["business_model_mean_mean"]),
+            "impact": clean_number(row["impact_mean_mean"]),
+            "problemMinusBusiness": clean_number(row["problem_minus_business"]),
+            "problemMinusPrototype": clean_number(row["problem_minus_prototype"]),
+            "impactMinusBusiness": clean_number(row["impact_minus_business"]),
+            "pattern": str(row["support_pattern"]),
+        }
+        for _, row in safe.sort_values("problem_minus_business", ascending=False).iterrows()
+    ]
 
 
 def build_model(m: int, summary: pd.Series) -> dict[str, Any]:
@@ -364,6 +528,8 @@ def build_model(m: int, summary: pd.Series) -> dict[str, Any]:
         "profiles": build_profiles(m, concepts, slices),
         "founderMatrix": build_founder_matrix(m),
         "disagreement": build_disagreement(m),
+        "trackSignatures": build_track_signatures(m, concepts),
+        "supportPortfolio": build_support_portfolio(m),
     }
 
 
@@ -392,9 +558,19 @@ def build_coverage() -> dict[str, Any]:
                 "usableProblemText": usable_n,
                 "missingProblemText": missing_n if missing_n >= MIN_CELL else None,
                 "missingSuppressed": 0 < missing_n < MIN_CELL,
+                "coverageStatus": "partial" if year == 2021 else "effectively_complete",
+                "coverageLabel": "Partial problem-text coverage" if year == 2021 else "Effectively complete problem-text coverage",
             }
         )
-    return {"yearTrack": records}
+    return {
+        "yearTrack": records,
+        "yearLabels": {
+            "2021": "Partial problem-text coverage",
+            "2022": "Effectively complete problem-text coverage",
+            "2023": "Effectively complete problem-text coverage",
+            "2024": "Effectively complete problem-text coverage",
+        },
+    }
 
 
 def build() -> dict[str, Any]:
@@ -402,16 +578,53 @@ def build() -> dict[str, Any]:
     audit = json.loads((TABLES / "audit_summary.json").read_text())
     models = {str(m): build_model(m, comparison.loc[m]) for m in (16, 32)}
 
-    primary_all = models["16"]["slices"]["primary"]["All tracks"]["All years"]["items"]
-    largest = max(primary_all, key=lambda item: item["n"])
-    highest = max(primary_all, key=lambda item: item["recommendation"] or -999)
-    fastest = max(primary_all, key=lambda item: item["trend"] or -999)
-    widest_gap = max(primary_all, key=lambda item: (item["problem"] or 0) - (item["business"] or 0))
+    leadership = models["16"]
+    concept_lookup = {item["id"]: item for item in leadership["concepts"]}
+    primary_all = leadership["slices"]["primary"]["All tracks"]["All years"]["items"]
+    headline_pool = [
+        item
+        for item in primary_all
+        if concept_lookup[item["id"]]["qualityBadge"] in {"Stable", "Stable but broad"}
+        and not concept_lookup[item["id"]]["smallAndUnstable"]
+    ]
+    largest = max(headline_pool, key=lambda item: item["n"])
+    fastest = max(
+        [item for item in headline_pool if item["trend2022To2024"] is not None and item["trendHeadlineEligible"]],
+        key=lambda item: item["trend2022To2024"],
+    )
+    adjusted_median = float(np.median([item["adjustedRecommendation"] for item in headline_pool]))
+    prevalence_median = float(np.median([item["share"] for item in headline_pool]))
+    stronger_lower_attention = sorted(
+        [
+            item
+            for item in headline_pool
+            if item["adjustedRecommendation"] > adjusted_median and item["share"] < prevalence_median
+        ],
+        key=lambda item: item["adjustedRecommendation"],
+        reverse=True,
+    )
+    support_pool = [
+        item for item in leadership["supportPortfolio"] if item["id"] in {row["id"] for row in headline_pool}
+    ]
+    support_ranked = sorted(
+        support_pool,
+        key=lambda item: max(item["problemMinusBusiness"], item["impactMinusBusiness"]),
+        reverse=True,
+    )
+    disagreement_ranked = sorted(
+        [item for item in leadership["disagreement"]["All tracks"] if item["id"] in {row["id"] for row in headline_pool}],
+        key=lambda item: item["meanWithinApplicationSd"],
+        reverse=True,
+    )
+    stronger = stronger_lower_attention[0]
+    support = support_ranked[0]
 
     payload: dict[str, Any] = {
         "meta": {
             "title": "Harvard i-lab Problem Landscape",
             "period": "2021–2024",
+            "defaultTrendPeriod": "2022–2024",
+            "partialCoveragePeriod": "2021–2024 (2021 partial problem-text coverage)",
             "generatedFrom": "validated local research pipeline",
             "privacy": f"Aggregate cells only; cells below {MIN_CELL} observations are suppressed.",
             "minimumCell": MIN_CELL,
@@ -423,57 +636,80 @@ def build() -> dict[str, Any]:
             "sourceGranularity": "judge-level",
             "defaultModel": 16,
             "defaultMembership": "primary",
+            "defaultSchoolView": "representation_index",
+            "defaultGenderView": "lead_applicant",
             "embeddingModel": "nomic-ai/modernbert-embed-base",
             "upstreamCommit": "706d8979c71befe8e3151f51a8d4dbf87d4d7e41",
+            "bootstrap": {"method": "application-level percentile bootstrap", "iterations": 2000, "seed": 42, "confidence": 0.95},
         },
         "models": models,
         "coverage": build_coverage(),
         "findings": [
             {
-                "eyebrow": "Portfolio concentration",
-                "value": f"{largest['n']} ventures",
+                "signal": "Largest established problem area",
+                "id": largest["id"],
                 "title": largest["label"],
-                "note": f"{largest['share'] * 100:.1f}% of ventures with usable problem text.",
+                "value": f"{largest['n']} applications",
+                "n": largest["n"],
+                "evidence": f"{largest['share'] * 100:.1f}% of applications with usable problem text use this as their primary area.",
+                "implication": "Use this as a baseline for where founder attention and i-lab exposure are already concentrated.",
             },
             {
-                "eyebrow": "Highest mean recommendation",
-                "value": f"{highest['recommendation']:.2f} / 5",
-                "title": highest["label"],
-                "note": f"Startup-weighted mean across {highest['n']} ventures; descriptive, not causal.",
-            },
-            {
-                "eyebrow": "Fastest attention growth",
-                "value": f"+{fastest['trend'] * 100:.1f} pts / year",
+                "signal": "Fastest established 2022–2024 attention increase",
+                "id": fastest["id"],
                 "title": fastest["label"],
-                "note": "Slope in yearly portfolio share across four annual observations.",
+                "value": f"{fastest['change2022To2024'] * 100:+.1f} pts",
+                "n": fastest["n"],
+                "evidence": f"Largest portfolio-share increase among areas with at least 10 applications in both endpoint years; N={fastest['n']} applications across all years.",
+                "implication": "Use the shift to prompt qualitative follow-up on changing founder needs, not as a forecast.",
             },
             {
-                "eyebrow": "Founder-support signal",
-                "value": f"+{(widest_gap['problem'] - widest_gap['business']):.2f}",
-                "title": widest_gap["label"],
-                "note": "Average problem-definition score minus average business-model score.",
+                "signal": "Stronger evaluation, lower historical attention",
+                "id": stronger["id"],
+                "title": stronger["label"],
+                "value": f"{stronger['adjustedRecommendation']:+.2f} adjusted",
+                "n": stronger["n"],
+                "evidence": f"Above-median year×track-adjusted Recommendation and below-median prevalence; raw {stronger['recommendation']:.2f}/5, N={stronger['n']} applications.",
+                "implication": "Treat this as a candidate for qualitative follow-up, not a market or investment claim.",
+            },
+            {
+                "signal": "Largest problem-vs-business-model gap",
+                "id": support["id"],
+                "title": support["label"],
+                "value": f"{support['problemMinusBusiness']:+.2f}",
+                "n": support["n"],
+                "evidence": f"Problem & Customer Definition minus Business Model across N={support['n']} applications.",
+                "implication": "Use the historical rubric profile to frame mentoring or curriculum questions; it does not identify a causal remedy.",
             },
         ],
+        "actionableSignals": {
+            "strongerEvaluationLowerAttention": [
+                {
+                    "id": item["id"], "label": item["label"], "n": item["n"],
+                    "share": item["share"], "rawRecommendation": item["recommendation"],
+                    "adjustedRecommendation": item["adjustedRecommendation"],
+                    "adjustedCiLow": item["adjustedRecommendationCiLow"],
+                    "adjustedCiHigh": item["adjustedRecommendationCiHigh"],
+                }
+                for item in stronger_lower_attention[:4]
+            ],
+            "founderSupportGaps": support_ranked[:4],
+            "judgeDisagreement": disagreement_ranked[:4],
+        },
     }
 
-    serialized = json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False)
-    forbidden = [
-        '"application_id"',
-        '"venture_name"',
-        '"problem_text"',
-        '"top_examples"',
-        '"moderate_examples"',
-        '"member_number"',
-        '"reviewer_email"',
-    ]
-    assert not any(term in serialized.lower() for term in forbidden)
+    assert_public_privacy(payload)
     for model in models.values():
         for membership in model["slices"].values():
             for scope in membership.values():
                 for period in scope.values():
                     assert all(item["n"] >= MIN_CELL for item in period["items"])
         for matrix in model["founderMatrix"].values():
-            assert all(cell["n"] >= MIN_CELL for cell in matrix)
+            if isinstance(matrix, list):
+                assert all(cell["n"] >= MIN_CELL for cell in matrix)
+        for signature in model["trackSignatures"].values():
+            assert all(cell["n"] >= MIN_CELL for cell in signature)
+        assert all(cell["n"] >= MIN_CELL for cell in model["supportPortfolio"])
     return payload
 
 

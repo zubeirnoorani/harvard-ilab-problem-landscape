@@ -1,16 +1,57 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from scipy.stats import linregress
 
-from .config import PATHS, RATING_COLUMNS, VALID_YEARS
+from .config import PATHS, RANDOM_SEED, RATING_COLUMNS, VALID_YEARS
 
 
 DIMENSIONS = list(RATING_COLUMNS)
+DEFAULT_TREND_YEARS = (2022, 2023, 2024)
+BOOTSTRAP_ITERATIONS = 2_000
+
+
+def bootstrap_mean_ci(
+    values: pd.Series | np.ndarray,
+    *,
+    seed: int = RANDOM_SEED,
+    iterations: int = BOOTSTRAP_ITERATIONS,
+) -> tuple[float, float]:
+    """Application-level percentile bootstrap interval for a mean."""
+    clean = pd.to_numeric(pd.Series(values), errors="coerce").dropna().to_numpy(dtype=float)
+    if not len(clean):
+        return np.nan, np.nan
+    if len(clean) == 1:
+        return float(clean[0]), float(clean[0])
+    rng = np.random.default_rng(seed)
+    samples = rng.choice(clean, size=(iterations, len(clean)), replace=True).mean(axis=1)
+    low, high = np.quantile(samples, [0.025, 0.975])
+    return float(low), float(high)
+
+
+def concept_quality_badge(stability: pd.Series, diagnostic: pd.Series) -> str:
+    """Translate recorded stability and human review evidence into a visible badge."""
+    notes = str(diagnostic.get("problem_quality_notes", ""))
+    caution = bool(
+        re.search(
+            r"geography-driven|heterogeneous|mixed|conflates|not leadership-ready|"
+            r"use cautiously|solution/technology|drift toward solution",
+            notes,
+            flags=re.IGNORECASE,
+        )
+    )
+    if bool(stability.get("small_and_unstable", False)) or bool(stability.get("small_primary_area", False)):
+        return "Small / exploratory"
+    if caution or str(stability.get("stability_flag", "")).lower() == "low":
+        return "Mixed / interpret cautiously"
+    if re.search(r"broad|overlap|broaden", notes, flags=re.IGNORECASE) or str(stability.get("stability_flag", "")).lower() == "moderate":
+        return "Stable but broad"
+    return "Stable"
 
 
 def load_analysis_inputs(m_concepts: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -26,7 +67,8 @@ def _summarize_outcomes(frame: pd.DataFrame, group_cols: list[str]) -> pd.DataFr
     for keys, group in frame.groupby(group_cols, dropna=False):
         keys = keys if isinstance(keys, tuple) else (keys,)
         row = dict(zip(group_cols, keys))
-        row["n_startups"] = int(group["application_id"].nunique())
+        row["n_applications"] = int(group["application_id"].nunique())
+        row["n_startups"] = row["n_applications"]  # Backward-compatible analytical column.
         row["share_of_scope"] = np.nan
         for dimension in DIMENSIONS:
             values = pd.to_numeric(group[f"{dimension}_mean"], errors="coerce")
@@ -37,6 +79,17 @@ def _summarize_outcomes(frame: pd.DataFrame, group_cols: list[str]) -> pd.DataFr
             row[f"{dimension}_n_ratings"] = int(
                 pd.to_numeric(group[f"{dimension}_n_judges"], errors="coerce").fillna(0).sum()
             )
+        raw_low, raw_high = bootstrap_mean_ci(group["recommendation_mean"])
+        adjusted = pd.to_numeric(group["recommendation_adjusted_year_track"], errors="coerce")
+        adjusted_low, adjusted_high = bootstrap_mean_ci(adjusted)
+        row["recommendation_ci_low"] = raw_low
+        row["recommendation_ci_high"] = raw_high
+        row["recommendation_adjusted_year_track_mean"] = float(adjusted.mean())
+        row["recommendation_adjusted_year_track_sd_between_applications"] = float(adjusted.std(ddof=1))
+        row["recommendation_adjusted_year_track_median"] = float(adjusted.median())
+        row["recommendation_adjusted_year_track_n_applications"] = int(adjusted.notna().sum())
+        row["recommendation_adjusted_year_track_ci_low"] = adjusted_low
+        row["recommendation_adjusted_year_track_ci_high"] = adjusted_high
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -115,16 +168,30 @@ def build_trends(primary: pd.DataFrame, m_concepts: int) -> pd.DataFrame:
             counts = group.groupby("year")["application_id"].nunique().reindex(VALID_YEARS, fill_value=0)
             denominators = scope.groupby("year")["application_id"].nunique().reindex(VALID_YEARS, fill_value=0)
             shares = counts.div(denominators.replace(0, np.nan))
-            valid = shares.notna()
-            slope = linregress(np.asarray(VALID_YEARS)[valid], shares[valid]).slope if valid.sum() >= 2 else np.nan
+            valid_default = shares.loc[list(DEFAULT_TREND_YEARS)].notna()
+            default_years = np.asarray(DEFAULT_TREND_YEARS)[valid_default]
+            default_shares = shares.loc[list(DEFAULT_TREND_YEARS)][valid_default]
+            slope_default = linregress(default_years, default_shares).slope if valid_default.sum() >= 2 else np.nan
+            valid_partial = shares.notna()
+            slope_partial = (
+                linregress(np.asarray(VALID_YEARS)[valid_partial], shares[valid_partial]).slope
+                if valid_partial.sum() >= 2
+                else np.nan
+            )
             row = {
                 "track_scope": track,
                 "concept_id": int(concept_id),
                 "concept_label": concept_label,
-                "trend_slope_share_per_year": float(slope),
-                "change_2021_to_2024": float(shares.loc[2024] - shares.loc[2021])
+                "trend_slope_2022_2024": float(slope_default),
+                "change_2022_to_2024": float(shares.loc[2024] - shares.loc[2022])
+                if pd.notna(shares.loc[2022]) and pd.notna(shares.loc[2024])
+                else np.nan,
+                "trend_slope_2021_2024_partial": float(slope_partial),
+                "change_2021_to_2024_partial": float(shares.loc[2024] - shares.loc[2021])
                 if pd.notna(shares.loc[2021]) and pd.notna(shares.loc[2024])
                 else np.nan,
+                "default_trend_period": "2022–2024",
+                "coverage_2021": "Partial problem-text coverage",
                 "small_n_flag": bool(counts.max() < 10),
                 "m_concepts": m_concepts,
             }
@@ -206,15 +273,20 @@ def analyze_judge_type(primary: pd.DataFrame, judge: pd.DataFrame, m_concepts: i
 def build_founder_long(startup: pd.DataFrame, primary: pd.DataFrame, m_concepts: int) -> pd.DataFrame:
     concept_keys = primary[["application_id", "concept_id", "concept_label"]]
     base = startup.merge(concept_keys, on="application_id", how="inner")
+    def supplied(value: object) -> str:
+        if pd.isna(value) or not str(value).strip():
+            return "Missing"
+        return str(value).strip()
+
     rows = []
     for _, row in base.iterrows():
         rows.append(
             {
                 "application_id": row["application_id"], "year": row["year"], "Track": row["Track"],
                 "concept_id": row["concept_id"], "concept_label": row["concept_label"],
-                "member_number": 1, "gender": row.get("Gender", "") or "Missing",
-                "harvard_school": row.get("School", "") or "Missing",
-                "country": row.get("location country", "") or "Missing",
+                "member_number": 1, "gender": supplied(row.get("Gender", "")),
+                "harvard_school": supplied(row.get("School", "")),
+                "country": supplied(row.get("location country", "")),
             }
         )
         for member in range(2, 6):
@@ -226,9 +298,9 @@ def build_founder_long(startup: pd.DataFrame, primary: pd.DataFrame, m_concepts:
                     "application_id": row["application_id"], "year": row["year"], "Track": row["Track"],
                     "concept_id": row["concept_id"], "concept_label": row["concept_label"],
                     "member_number": member,
-                    "gender": str(row.get(f"m{member} gender", "") or "Missing"),
-                    "harvard_school": str(row.get(f"m{member} Harvard", "") or "Missing"),
-                    "country": str(row.get(f"m{member} location country", "") or "Missing"),
+                    "gender": supplied(row.get(f"m{member} gender", "")),
+                    "harvard_school": supplied(row.get(f"m{member} Harvard", "")),
+                    "country": supplied(row.get(f"m{member} location country", "")),
                 }
             )
     founder = pd.DataFrame(rows)
@@ -267,6 +339,112 @@ def composition_tables(
     return outputs
 
 
+def build_track_overrepresentation(primary: pd.DataFrame, m_concepts: int) -> pd.DataFrame:
+    """Compare each track's concept concentration with the full usable portfolio."""
+    overall_n = int(primary["application_id"].nunique())
+    overall_counts = primary.groupby(["concept_id", "concept_label"])["application_id"].nunique()
+    rows: list[dict[str, object]] = []
+    for track, track_frame in primary.groupby("Track"):
+        track_n = int(track_frame["application_id"].nunique())
+        track_counts = track_frame.groupby(["concept_id", "concept_label"])["application_id"].nunique()
+        for (concept_id, concept_label), overall_concept_n in overall_counts.items():
+            n = int(track_counts.get((concept_id, concept_label), 0))
+            track_share = n / track_n if track_n else np.nan
+            overall_share = int(overall_concept_n) / overall_n if overall_n else np.nan
+            rows.append(
+                {
+                    "Track": track,
+                    "concept_id": int(concept_id),
+                    "concept_label": concept_label,
+                    "n_applications": n,
+                    "track_n_applications": track_n,
+                    "overall_concept_n_applications": int(overall_concept_n),
+                    "overall_n_applications": overall_n,
+                    "track_share": track_share,
+                    "overall_share": overall_share,
+                    "overrepresentation_ratio": track_share / overall_share if overall_share else np.nan,
+                    "share_difference": track_share - overall_share,
+                    "small_n_flag": n < 10,
+                    "m_concepts": m_concepts,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def lead_gender_composition(primary: pd.DataFrame, m_concepts: int) -> pd.DataFrame:
+    """Application-level lead gender, distinct from team-member records."""
+    data = primary[["application_id", "concept_id", "concept_label", "Gender"]].copy()
+    data["lead_gender"] = data["Gender"].where(data["Gender"].notna() & data["Gender"].astype(str).str.strip().ne(""), "Missing")
+    rows = (
+        data.groupby(["concept_id", "concept_label", "lead_gender"], dropna=False)["application_id"]
+        .nunique()
+        .rename("n_applications")
+        .reset_index()
+    )
+    total = data.groupby("concept_id")["application_id"].nunique()
+    reported = data.loc[data["lead_gender"].ne("Missing")].groupby("concept_id")["application_id"].nunique()
+    rows["problem_n_applications"] = rows["concept_id"].map(total).astype(int)
+    rows["reported_lead_gender_n"] = rows["concept_id"].map(reported).fillna(0).astype(int)
+    rows["reporting_coverage"] = rows["reported_lead_gender_n"] / rows["problem_n_applications"]
+    rows["share_among_reported"] = np.where(
+        rows["lead_gender"].ne("Missing") & rows["reported_lead_gender_n"].gt(0),
+        rows["n_applications"] / rows["reported_lead_gender_n"],
+        np.nan,
+    )
+    rows["m_concepts"] = m_concepts
+    return rows
+
+
+def team_gender_composition(founder: pd.DataFrame, m_concepts: int) -> pd.DataFrame:
+    """Reported lead-and-team gender records with explicit coverage denominators."""
+    data = founder.copy()
+    data["gender"] = data["gender"].fillna("Missing").replace("", "Missing")
+    rows = (
+        data.groupby(["concept_id", "concept_label", "gender"], dropna=False)
+        .size()
+        .rename("n_founders")
+        .reset_index()
+    )
+    total = data.groupby("concept_id").size()
+    reported = data.loc[data["gender"].ne("Missing")].groupby("concept_id").size()
+    rows["team_records_total"] = rows["concept_id"].map(total).astype(int)
+    rows["team_gender_reported_n"] = rows["concept_id"].map(reported).fillna(0).astype(int)
+    rows["reporting_coverage"] = rows["team_gender_reported_n"] / rows["team_records_total"]
+    rows["share_among_reported"] = np.where(
+        rows["gender"].ne("Missing") & rows["team_gender_reported_n"].gt(0),
+        rows["n_founders"] / rows["team_gender_reported_n"],
+        np.nan,
+    )
+    rows["m_concepts"] = m_concepts
+    return rows
+
+
+def school_representation_index(founder: pd.DataFrame, m_concepts: int) -> pd.DataFrame:
+    """Normalize school presence in each problem by the reported-founder baseline."""
+    data = founder.copy()
+    data["harvard_school"] = data["harvard_school"].fillna("Missing").replace("", "Missing")
+    reported = data.loc[data["harvard_school"].ne("Missing")].copy()
+    portfolio_total = int(len(reported))
+    portfolio_school = reported.groupby("harvard_school").size()
+    problem_total = reported.groupby("concept_id").size()
+    rows = (
+        reported.groupby(["concept_id", "concept_label", "harvard_school"])
+        .size()
+        .rename("n_founders")
+        .reset_index()
+    )
+    rows["reported_founders_in_problem"] = rows["concept_id"].map(problem_total).astype(int)
+    rows["reported_founders_portfolio"] = portfolio_total
+    rows["portfolio_school_n"] = rows["harvard_school"].map(portfolio_school).astype(int)
+    rows["share_of_problem_from_school"] = rows["n_founders"] / rows["reported_founders_in_problem"]
+    rows["share_of_all_reported_founders_from_school"] = rows["portfolio_school_n"] / portfolio_total
+    rows["representation_index"] = (
+        rows["share_of_problem_from_school"] / rows["share_of_all_reported_founders_from_school"]
+    )
+    rows["m_concepts"] = m_concepts
+    return rows
+
+
 def intervention_profiles(primary: pd.DataFrame, m_concepts: int) -> pd.DataFrame:
     columns = [f"{dimension}_mean" for dimension in ("problem_customer_definition", "solution_prototype", "business_model", "impact")]
     profile = primary.groupby(["concept_id", "concept_label"])[columns].agg(["mean", "count"])
@@ -278,6 +456,7 @@ def intervention_profiles(primary: pd.DataFrame, m_concepts: int) -> pd.DataFram
         std = profile[column].std(ddof=0)
         profile[column.replace("_mean_mean", "_z")] = (profile[column] - profile[column].mean()) / std if std else 0
     profile["problem_minus_business"] = profile["problem_customer_definition_mean_mean"] - profile["business_model_mean_mean"]
+    profile["problem_minus_prototype"] = profile["problem_customer_definition_mean_mean"] - profile["solution_prototype_mean_mean"]
     profile["prototype_minus_problem"] = profile["solution_prototype_mean_mean"] - profile["problem_customer_definition_mean_mean"]
     profile["impact_minus_business"] = profile["impact_mean_mean"] - profile["business_model_mean_mean"]
 
@@ -289,11 +468,11 @@ def intervention_profiles(primary: pd.DataFrame, m_concepts: int) -> pd.DataFram
         if min(z_problem, z_solution, z_business, z_impact) > 0:
             return "Relatively strong across dimensions"
         if z_problem > 0.35 and z_business < -0.35:
-            return "Compelling problem / weaker business model"
+            return "Problem understood / business model gap"
         if z_solution > 0.35 and z_problem < -0.35:
-            return "Stronger prototype / weaker problem definition"
+            return "Prototype ahead of customer definition"
         if z_impact > 0.35 and z_business < -0.35:
-            return "Higher impact / weaker commercialization"
+            return "Strong impact / commercialization gap"
         return "Mixed profile"
 
     profile["support_pattern"] = profile.apply(pattern, axis=1)
@@ -310,20 +489,20 @@ def strategic_map(primary: pd.DataFrame, trends: pd.DataFrame, disagreement: pd.
     ]]
     out = summary.merge(trend, on=["concept_id", "concept_label"], how="left").merge(disagree, on="concept_id", how="left")
     out["prevalence"] = out["n_startups"] / primary["application_id"].nunique()
-    rating_cut = out["recommendation_mean"].median()
+    rating_cut = out["recommendation_adjusted_year_track_mean"].median()
     size_cut = out["n_startups"].median()
     growth_cut = 0.005
     disagree_cut = out["mean_within_startup_recommendation_sd"].median()
 
     def labels(row: pd.Series) -> str:
         values = []
-        if row["recommendation_mean"] >= rating_cut and row["trend_slope_share_per_year"] > growth_cut:
-            values.append("high-rated + growing")
-        if row["recommendation_mean"] >= rating_cut and row["n_startups"] < size_cut:
-            values.append("high-rated + underrepresented")
+        if row["recommendation_adjusted_year_track_mean"] >= rating_cut and row["trend_slope_2022_2024"] > growth_cut:
+            values.append("relatively stronger evaluated + growing")
+        if row["recommendation_adjusted_year_track_mean"] >= rating_cut and row["n_startups"] < size_cut:
+            values.append("stronger evaluation + lower historical attention")
         if row["n_startups"] >= size_cut:
             values.append("highly populated")
-        if row["trend_slope_share_per_year"] > growth_cut:
+        if row["trend_slope_2022_2024"] > growth_cut:
             values.append("emerging")
         if row["mean_within_startup_recommendation_sd"] >= disagree_cut:
             values.append("polarizing")
@@ -344,12 +523,17 @@ def problem_profile(
     intervention: pd.DataFrame,
     founder: pd.DataFrame,
     overlap: pd.DataFrame,
+    stability: pd.DataFrame,
+    track_overrepresentation: pd.DataFrame,
     m_concepts: int,
 ) -> dict[str, object]:
     group = primary.loc[primary["concept_id"].eq(concept_id)].copy()
     diagnostic = diagnostics.set_index("concept_id").loc[concept_id]
     trend = trends.loc[(trends["track_scope"].eq("All tracks")) & trends["concept_id"].eq(concept_id)].iloc[0]
     disagree = disagreement.loc[(disagreement["track_scope"].eq("All tracks")) & disagreement["concept_id"].eq(concept_id)].iloc[0]
+    outcome = _summarize_outcomes(group, ["concept_id", "concept_label"]).iloc[0]
+    stability_row = stability.set_index("concept_id").loc[concept_id]
+    support_row = intervention.set_index("concept_id").loc[concept_id]
     dimensions = {dimension: float(group[f"{dimension}_mean"].mean()) for dimension in DIMENSIONS}
 
     def distribution(frame: pd.DataFrame, field: str) -> dict[str, int]:
@@ -366,19 +550,46 @@ def problem_profile(
         "problem_label": diagnostic["concept_label"],
         "description": diagnostic["description"],
         "quality_notes": diagnostic["problem_quality_notes"],
-        "n_ventures": int(group["application_id"].nunique()),
+        "quality_badge": concept_quality_badge(stability_row, diagnostic),
+        "activation_stability": str(stability_row["stability_flag"]),
+        "membership_jaccard": float(stability_row["mean_matched_membership_jaccard"]),
+        "activation_correlation": float(stability_row["mean_matched_activation_correlation"]),
+        "n_applications": int(group["application_id"].nunique()),
         "share_of_portfolio": float(group["application_id"].nunique() / primary["application_id"].nunique()),
-        "recommendation_mean": float(group["recommendation_mean"].mean()),
-        "recommendation_sd_between_startups": float(group["recommendation_mean"].std(ddof=1)),
+        "recommendation_mean": float(outcome["recommendation_mean"]),
+        "recommendation_ci_95": [float(outcome["recommendation_ci_low"]), float(outcome["recommendation_ci_high"])],
+        "recommendation_sd_between_applications": float(group["recommendation_mean"].std(ddof=1)),
+        "recommendation_adjusted_year_track_mean": float(outcome["recommendation_adjusted_year_track_mean"]),
+        "recommendation_adjusted_year_track_ci_95": [
+            float(outcome["recommendation_adjusted_year_track_ci_low"]),
+            float(outcome["recommendation_adjusted_year_track_ci_high"]),
+        ],
         "judge_disagreement_mean_within_startup_sd": float(disagree["mean_within_startup_recommendation_sd"]),
-        "trend_share_per_year": float(trend["trend_slope_share_per_year"]),
-        "change_2021_to_2024": float(trend["change_2021_to_2024"]),
+        "trend_slope_2022_2024": float(trend["trend_slope_2022_2024"]),
+        "change_2022_to_2024": float(trend["change_2022_to_2024"]),
+        "trend_slope_2021_2024_partial": float(trend["trend_slope_2021_2024_partial"]),
+        "change_2021_to_2024_partial": float(trend["change_2021_to_2024_partial"]),
         "track_distribution": distribution(group, "Track"),
+        "track_overrepresentation": [
+            {
+                "track": str(row["Track"]),
+                "n_applications": int(row["n_applications"]),
+                "overrepresentation_ratio": float(row["overrepresentation_ratio"]),
+            }
+            for _, row in track_overrepresentation.loc[
+                track_overrepresentation["concept_id"].eq(concept_id)
+            ].sort_values("overrepresentation_ratio", ascending=False).iterrows()
+        ],
         "school_distribution": distribution(founder.loc[founder["concept_id"].eq(concept_id)], "harvard_school"),
         "gender_distribution": distribution(founder.loc[founder["concept_id"].eq(concept_id)], "gender"),
         "geography_distribution": distribution(group, "venture location country"),
         "judging_dimension_averages": dimensions,
-        "support_pattern": intervention.set_index("concept_id").loc[concept_id, "support_pattern"],
+        "support_pattern": support_row["support_pattern"],
+        "support_gaps": {
+            "problem_minus_business": float(support_row["problem_minus_business"]),
+            "problem_minus_prototype": float(support_row["problem_minus_prototype"]),
+            "impact_minus_business": float(support_row["impact_minus_business"]),
+        },
         "representative_startups": [{k: example[k] for k in ("venture", "year", "track", "problem_text")} for example in examples],
         "related_concepts": [
             {
@@ -395,11 +606,14 @@ def _write_profile_markdown(profile: dict[str, object], path: Path) -> None:
     lines = [
         f"# Problem Profile: {profile['problem_label']}", "",
         str(profile["description"]), "",
-        f"- Ventures: **{profile['n_ventures']}** ({profile['share_of_portfolio']:.1%} of eligible portfolio)",
-        f"- Recommendation: **{profile['recommendation_mean']:.2f}** mean; **{profile['recommendation_sd_between_startups']:.2f}** SD across startups",
-        f"- Judge disagreement: **{profile['judge_disagreement_mean_within_startup_sd']:.2f}** mean within-startup SD",
-        f"- Annual share trend: **{profile['trend_share_per_year']:+.2%}** per year",
-        f"- 2021–2024 share change: **{profile['change_2021_to_2024']:+.2%}**",
+        f"- Applications: **{profile['n_applications']}** ({profile['share_of_portfolio']:.1%} of eligible portfolio)",
+        f"- Raw Recommendation: **{profile['recommendation_mean']:.2f}** (application-level bootstrap 95% CI {profile['recommendation_ci_95'][0]:.2f}–{profile['recommendation_ci_95'][1]:.2f})",
+        f"- Year×track-adjusted Recommendation: **{profile['recommendation_adjusted_year_track_mean']:+.2f}** (95% CI {profile['recommendation_adjusted_year_track_ci_95'][0]:+.2f}–{profile['recommendation_adjusted_year_track_ci_95'][1]:+.2f})",
+        f"- Judge disagreement: **{profile['judge_disagreement_mean_within_startup_sd']:.2f}** mean within-application SD",
+        f"- 2022–2024 annual share trend: **{profile['trend_slope_2022_2024']:+.2%}** per year",
+        f"- 2022–2024 share change: **{profile['change_2022_to_2024']:+.2%}**",
+        f"- 2021–2024 partial-coverage trend: **{profile['trend_slope_2021_2024_partial']:+.2%}** per year",
+        f"- Concept quality: **{profile['quality_badge']}**",
         f"- Support diagnostic: **{profile['support_pattern']}**", "",
         "## Judging dimensions", "",
     ]
@@ -429,6 +643,10 @@ def run_analysis(m_concepts: int) -> dict[str, pd.DataFrame | dict[str, object]]
     judge_type = analyze_judge_type(primary, judge, m_concepts)
     founder = build_founder_long(startup, primary, m_concepts)
     composition = composition_tables(primary, founder, m_concepts)
+    track_overrepresentation = build_track_overrepresentation(primary, m_concepts)
+    lead_gender = lead_gender_composition(primary, m_concepts)
+    team_gender = team_gender_composition(founder, m_concepts)
+    school_representation = school_representation_index(founder, m_concepts)
     intervention = intervention_profiles(primary, m_concepts)
     strategic = strategic_map(primary, trends, disagreement, m_concepts)
 
@@ -440,13 +658,18 @@ def run_analysis(m_concepts: int) -> dict[str, pd.DataFrame | dict[str, object]]
         "founder_demographics_long": founder,
         "intervention_profiles": intervention,
         "strategic_map": strategic,
+        "track_overrepresentation": track_overrepresentation,
+        "lead_gender_composition": lead_gender,
+        "team_gender_composition": team_gender,
+        "school_representation": school_representation,
     }
     for name, table in tables.items():
         table.to_csv(PATHS.tables / f"{name}_m{m_concepts}.csv", index=False)
     for name, table in composition.items():
-        table.to_csv(PATHS.tables / f"composition_{name.replace(' ', '_')}_m{m_concepts}.csv")
+        table.to_csv(PATHS.tables / f"composition_{name.replace(' ', '_')}_m{m_concepts}.csv", index=False)
 
     overlap = pd.read_csv(PATHS.tables / f"concept_overlap_m{m_concepts}.csv")
+    stability = pd.read_csv(PATHS.tables / f"concept_stability_m{m_concepts}.csv")
     review = diagnostics[["concept_id", "problem_quality_notes"]].copy()
     review["leadership_ready_example"] = ~review["problem_quality_notes"].str.contains(
         r"geography-driven|heterogeneous|mixed|conflates|not leadership-ready|use cautiously|solution/technology",
@@ -456,7 +679,19 @@ def run_analysis(m_concepts: int) -> dict[str, pd.DataFrame | dict[str, object]]
     eligible = strategic.loc[~strategic["small_n_flag"]].merge(review, on="concept_id", how="left")
     eligible = eligible.loc[eligible["leadership_ready_example"].fillna(False)]
     chosen = int(eligible.sort_values(["recommendation_mean", "n_startups"], ascending=False).iloc[0]["concept_id"])
-    profile = problem_profile(chosen, primary, diagnostics, trends, disagreement, intervention, founder, overlap, m_concepts)
+    profile = problem_profile(
+        chosen,
+        primary,
+        diagnostics,
+        trends,
+        disagreement,
+        intervention,
+        founder,
+        overlap,
+        stability,
+        track_overrepresentation,
+        m_concepts,
+    )
     profile_path = PATHS.profiles / f"problem_profile_m{m_concepts}_concept_{chosen:02d}.json"
     profile_path.write_text(json.dumps(profile, indent=2, ensure_ascii=False), encoding="utf-8")
     _write_profile_markdown(profile, PATHS.profiles / f"problem_profile_m{m_concepts}_concept_{chosen:02d}.md")
@@ -470,46 +705,98 @@ def write_friday_findings(m_concepts: int = 16) -> Path:
     disagreement = pd.read_csv(PATHS.tables / f"judge_disagreement_m{m_concepts}.csv")
     intervention = pd.read_csv(PATHS.tables / f"intervention_profiles_m{m_concepts}.csv")
     stability = pd.read_csv(PATHS.tables / f"concept_stability_m{m_concepts}.csv")
-    stability32 = pd.read_csv(PATHS.tables / "concept_stability_m32.csv")
-    missing = pd.read_csv(PATHS.tables / "problem_text_missingness.csv")
-    all_trends = trends.loc[trends["track_scope"].eq("All tracks") & ~trends["small_n_flag"]]
-    all_disagreement = disagreement.loc[disagreement["track_scope"].eq("All tracks") & ~disagreement["small_n_flag"]]
-    top_size = strategic.nlargest(2, "n_startups")
-    top_rating = strategic.loc[~strategic["small_n_flag"]].nlargest(2, "recommendation_mean")
-    fastest = all_trends.nlargest(2, "trend_slope_share_per_year")
-    polarizing = all_disagreement.nlargest(2, "mean_within_startup_recommendation_sd")
-    support = intervention.loc[~intervention["small_n_flag"]].copy()
-    support = support.loc[support["support_pattern"].ne("Mixed profile")].head(2)
-    missing_total = int(missing.loc[missing["problem_text_quality"].eq("low"), "n_applications"].sum())
+    quality = diagnostics[["concept_id", "problem_quality_notes"]].merge(
+        stability,
+        on="concept_id",
+        how="left",
+    )
+    quality["quality_badge"] = quality.apply(
+        lambda row: concept_quality_badge(row, row),
+        axis=1,
+    )
+    leadership_ids = set(
+        quality.loc[
+            ~quality["small_primary_area"].astype(bool)
+            & ~quality["small_and_unstable"].astype(bool)
+            & quality["quality_badge"].isin(["Stable", "Stable but broad"]),
+            "concept_id",
+        ].astype(int)
+    )
+    eligible = strategic.loc[
+        ~strategic["small_n_flag"].astype(bool) & strategic["concept_id"].isin(leadership_ids)
+    ].copy()
+    largest = eligible.nlargest(1, "n_startups").iloc[0]
+    trend_eligible = trends.loc[
+        trends["track_scope"].eq("All tracks")
+        & ~trends["small_n_flag"].astype(bool)
+        & trends["concept_id"].isin(leadership_ids)
+    ].merge(eligible[["concept_id", "n_startups"]], on="concept_id", how="left")
+    fastest = trend_eligible.nlargest(1, "trend_slope_2022_2024").iloc[0]
+    adjusted_median = eligible["recommendation_adjusted_year_track_mean"].median()
+    prevalence_median = eligible["prevalence"].median()
+    lower_attention = eligible.loc[
+        eligible["recommendation_adjusted_year_track_mean"].gt(adjusted_median)
+        & eligible["prevalence"].lt(prevalence_median)
+    ]
+    stronger = lower_attention.nlargest(1, "recommendation_adjusted_year_track_mean").iloc[0]
+    support = intervention.loc[
+        ~intervention["small_n_flag"].astype(bool) & intervention["concept_id"].isin(leadership_ids)
+    ].nlargest(1, "problem_minus_business").iloc[0]
+    polarizing = disagreement.loc[
+        disagreement["track_scope"].eq("All tracks")
+        & ~disagreement["small_n_flag"].astype(bool)
+        & disagreement["concept_id"].isin(leadership_ids)
+    ].nlargest(1, "mean_within_startup_recommendation_sd").iloc[0]
     lines = [
         "# Friday Meeting Findings", "",
-        "These findings are descriptive, use startup-level weighting, and come from the 16-feature leadership view. "
-        "Concepts were learned from demand-side problem text without using judge scores. Small-N results are excluded from rankings below.", "",
-        f"1. **Structured problem coverage is high after 2021, but incomplete overall.** {459:,} of 509 applications have usable structured problem/customer text; {missing_total} are flagged rather than backfilled from product descriptions.",
+        "This tool gives Harvard i-lab a portfolio-level view of the customer problems founders choose, where historical applications appear to need support, and where judges disagree. "
+        "It is designed to help leadership ask sharper programming and portfolio questions—not to rank markets or infer causal effects.", "",
+        "All findings use the M=16 primary-assignment leadership taxonomy and equal application weighting. Growth uses 2022–2024 because 2021 has partial structured problem-text coverage (62 of 112 applications); 2021 remains available as historical context but is not treated as fully comparable.", "",
+        (
+            f"1. **The portfolio is concentrated in a small number of recurring customer problems.**  "
+            f"**Evidence:** “{largest['concept_label']}” is the largest established primary area, with "
+            f"**N={int(largest['n_startups'])} applications** ({largest['prevalence']:.1%} of the 459 usable application-year observations).  "
+            "**Why it might matter:** This provides a concrete baseline for where founder attention and i-lab exposure are already concentrated.  "
+            "**Caution:** Primary assignment simplifies an overlapping concept model; applications can activate multiple features."
+        ),
+        (
+            f"2. **One established problem area shows the clearest 2022–2024 attention increase.**  "
+            f"**Evidence:** Among areas with at least 10 applications in both endpoint years, “{fastest['concept_label']}” changed by **{fastest['change_2022_to_2024']:+.1%}** of the annual usable portfolio "
+            f"from 2022 to 2024, with a simple slope of {fastest['trend_slope_2022_2024']:+.1%} per year "
+            f"({int(fastest['count_2022'])} applications in 2022; {int(fastest['count_2024'])} in 2024; **N={int(fastest['n_startups'])} applications** across all years).  "
+            "**Why it might matter:** A sustained descriptive shift can prompt curriculum, mentor, or domain-network conversations.  "
+            "**Caution:** Three annual points are not a forecast, and changing applicant composition may contribute."
+        ),
+        (
+            f"3. **A lower-attention area received relatively stronger evaluations after year×track adjustment.**  "
+            f"**Evidence:** “{stronger['concept_label']}” has adjusted Recommendation **{stronger['recommendation_adjusted_year_track_mean']:+.2f}** "
+            f"(application-level bootstrap 95% CI {stronger['recommendation_adjusted_year_track_ci_low']:+.2f} to {stronger['recommendation_adjusted_year_track_ci_high']:+.2f}), "
+            f"raw Recommendation {stronger['recommendation_mean']:.2f}/5, and **N={int(stronger['n_startups'])} applications**.  "
+            "**Why it might matter:** It is a useful candidate for qualitative follow-up on why relatively favorable evaluations coexist with lower historical attention.  "
+            "**Caution:** This is a descriptive within-year-and-track centering, not a causal effect or proof of statistical difference."
+        ),
+        (
+            f"4. **The largest rubric gap points to a commercialization question.**  "
+            f"**Evidence:** “{support['concept_label']}” averages {support['problem_customer_definition_mean_mean']:.2f} on Problem & Customer Definition and "
+            f"{support['business_model_mean_mean']:.2f} on Business Model, a gap of **{support['problem_minus_business']:+.2f}** "
+            f"across **N={int(support['n_startups'])} applications**.  "
+            "**Why it might matter:** The pattern can inform questions for programming, mentoring, or curriculum around commercialization.  "
+            "**Caution:** Historical judging profiles do not establish that a specific intervention will improve outcomes."
+        ),
+        (
+            f"5. **Judge disagreement is highest in one established problem area.**  "
+            f"**Evidence:** “{polarizing['concept_label']}” has mean within-application Recommendation SD **{polarizing['mean_within_startup_recommendation_sd']:.2f}**, "
+            f"based on **N={int(polarizing['n_startups'])} applications** and {int(polarizing['n_underlying_ratings'])} underlying ratings.  "
+            "**Why it might matter:** High disagreement can identify spaces where evaluation criteria, domain expertise, or risk perspectives merit discussion.  "
+            "**Caution:** Disagreement is not synonymous with quality or controversy, and judge mix may differ by year and track."
+        ),
     ]
-    number = 2
-    for _, row in top_size.iterrows():
-        lines.append(f"{number}. **Portfolio concentration:** “{row['concept_label']}” is a large primary problem area with {int(row['n_startups'])} ventures ({row['prevalence']:.1%} of eligible applications).")
-        number += 1
-    for _, row in fastest.iterrows():
-        lines.append(f"{number}. **Growing attention:** “{row['concept_label']}” increased by {row['trend_slope_share_per_year']:+.1%} of the annual eligible portfolio per year on a simple linear trend (counts: {int(row['count_2021'])} in 2021; {int(row['count_2024'])} in 2024).")
-        number += 1
-    for _, row in top_rating.iterrows():
-        lines.append(f"{number}. **Stronger evaluations:** “{row['concept_label']}” has a mean startup Recommendation of {row['recommendation_mean']:.2f} across {int(row['n_startups'])} ventures; this is descriptive, not evidence of causal advantage.")
-        number += 1
-    for _, row in polarizing.iterrows():
-        lines.append(f"{number}. **Judge polarization:** “{row['concept_label']}” has mean within-startup Recommendation SD of {row['mean_within_startup_recommendation_sd']:.2f} across {int(row['n_startups'])} ventures ({int(row['n_underlying_ratings'])} ratings).")
-        number += 1
-    for _, row in support.iterrows():
-        lines.append(f"{number}. **Programming signal:** “{row['concept_label']}” is classified as *{row['support_pattern'].lower()}* based on its relative four-dimension profile; this can guide support conversations, not causal claims.")
-        number += 1
     lines.extend([
         "", "## Method cautions", "",
-        "- A startup may activate several SAE features; the counts above use the highest-activation feature only for legibility.",
-        "- The 32-feature view is useful for drill-down but contains smaller and more mixed areas; the 16-feature view is the default leadership summary.",
-        f"- Alternate-seed checks flag {int(stability['small_and_unstable'].sum())} of 16 and {int(stability32['small_and_unstable'].sum())} of 32 concepts as both small primary areas and low/moderate stability.",
-        "- Geographic and demographic missingness is shown in the dashboard and must remain in denominators.",
-        "- Labels are human-reviewed descriptions of strongest and moderate activations; mixed features are flagged in the diagnostic tables.",
+        "- Recommendation intervals use a fixed-seed, 2,000-resample percentile bootstrap of application-level means.",
+        "- The adjusted score subtracts the equally weighted mean application Recommendation within the same year and track; it does not adjust for all selection or judge-composition differences.",
+        "- M=32 remains a detailed/exploratory view. Small, unstable, and explicitly mixed concepts are excluded from these headline selections.",
+        "- No missing 2021 problem text is backfilled from solution or product descriptions.",
     ])
     path = PATHS.outputs / "FRIDAY_MEETING_FINDINGS.md"
     path.write_text("\n".join(lines), encoding="utf-8")

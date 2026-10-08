@@ -1,23 +1,18 @@
 # Friday Meeting Findings
 
-These findings are descriptive, use startup-level weighting, and come from the 16-feature leadership view. Concepts were learned from demand-side problem text without using judge scores. Small-N results are excluded from rankings below.
+This tool gives Harvard i-lab a portfolio-level view of the customer problems founders choose, where historical applications appear to need support, and where judges disagree. It is designed to help leadership ask sharper programming and portfolio questions—not to rank markets or infer causal effects.
 
-1. **Structured problem coverage is high after 2021, but incomplete overall.** 459 of 509 applications have usable structured problem/customer text; 50 are flagged rather than backfilled from product descriptions.
-2. **Portfolio concentration:** “Equitable K–12 learning and student support” is a large primary problem area with 78 ventures (17.0% of eligible applications).
-3. **Portfolio concentration:** “Living better with chronic and neurological conditions” is a large primary problem area with 55 ventures (12.0% of eligible applications).
-4. **Growing attention:** “Organizational workflow and team coordination” increased by +3.4 percentage points of the annual eligible portfolio per year on a simple linear trend. Exact annual cells below 10 are suppressed in public outputs.
-5. **Growing attention:** “Living better with chronic and neurological conditions” increased by +2.2 percentage points of the annual eligible portfolio per year on a simple linear trend. Exact annual cells below 10 are suppressed in public outputs.
-6. **Stronger evaluations:** “Financial access and livelihoods in emerging markets” has a mean startup Recommendation of 3.58 across 27 ventures; this is descriptive, not evidence of causal advantage.
-7. **Stronger evaluations:** “Workforce access, hiring, and career mobility” has a mean startup Recommendation of 3.48 across 32 ventures; this is descriptive, not evidence of causal advantage.
-8. **Judge polarization:** “Climate-smart production and decarbonization” has mean within-startup Recommendation SD of 1.10 across 37 ventures (486 ratings).
-9. **Judge polarization:** “Inclusive consumer goods and personal expression” has mean within-startup Recommendation SD of 1.06 across 22 ventures (326 ratings).
-10. **Programming signal:** “Workforce access, hiring, and career mobility” is classified as *relatively strong across dimensions* based on its relative four-dimension profile; this can guide support conversations, not causal claims.
-11. **Programming signal:** “Equitable K–12 learning and student support” is classified as *compelling problem / weaker business model* based on its relative four-dimension profile; this can guide support conversations, not causal claims.
+All findings use the M=16 primary-assignment leadership taxonomy and equal application weighting. Growth uses 2022–2024 because 2021 has partial structured problem-text coverage (62 of 112 applications); 2021 remains available as historical context but is not treated as fully comparable.
+
+1. **The portfolio is concentrated in a small number of recurring customer problems.**  **Evidence:** “Equitable K–12 learning and student support” is the largest established primary area, with **N=78 applications** (17.0% of the 459 usable application-year observations).  **Why it might matter:** This provides a concrete baseline for where founder attention and i-lab exposure are already concentrated.  **Caution:** Primary assignment simplifies an overlapping concept model; applications can activate multiple features.
+2. **One established problem area shows the clearest 2022–2024 attention increase.**  **Evidence:** Among areas with at least 10 applications in both endpoint years, “Organizational workflow and team coordination” changed by **+3.3%** of the annual usable portfolio from 2022 to 2024, with a simple slope of +1.7% per year (12 applications in 2022; 16 in 2024; **N=43 applications** across all years).  **Why it might matter:** A sustained descriptive shift can prompt curriculum, mentor, or domain-network conversations.  **Caution:** Three annual points are not a forecast, and changing applicant composition may contribute.
+3. **A lower-attention area received relatively stronger evaluations after year×track adjustment.**  **Evidence:** “Effective therapies for underserved diseases” has adjusted Recommendation **+0.08** (application-level bootstrap 95% CI -0.06 to +0.25), raw Recommendation 3.41/5, and **N=20 applications**.  **Why it might matter:** It is a useful candidate for qualitative follow-up on why relatively favorable evaluations coexist with lower historical attention.  **Caution:** This is a descriptive within-year-and-track centering, not a causal effect or proof of statistical difference.
+4. **The largest rubric gap points to a commercialization question.**  **Evidence:** “Social connection and loneliness” averages 3.86 on Problem & Customer Definition and 2.77 on Business Model, a gap of **+1.08** across **N=21 applications**.  **Why it might matter:** The pattern can inform questions for programming, mentoring, or curriculum around commercialization.  **Caution:** Historical judging profiles do not establish that a specific intervention will improve outcomes.
+5. **Judge disagreement is highest in one established problem area.**  **Evidence:** “Climate-smart production and decarbonization” has mean within-application Recommendation SD **1.10**, based on **N=37 applications** and 486 underlying ratings.  **Why it might matter:** High disagreement can identify spaces where evaluation criteria, domain expertise, or risk perspectives merit discussion.  **Caution:** Disagreement is not synonymous with quality or controversy, and judge mix may differ by year and track.
 
 ## Method cautions
 
-- A startup may activate several SAE features; the counts above use the highest-activation feature only for legibility.
-- The 32-feature view is useful for drill-down but contains smaller and more mixed areas; the 16-feature view is the default leadership summary.
-- Alternate-seed checks flag 2 of 16 and 8 of 32 concepts as both small primary areas and low/moderate stability.
-- Geographic and demographic missingness is shown in the dashboard and must remain in denominators.
-- Labels are human-reviewed descriptions of strongest and moderate activations; mixed features are flagged in the diagnostic tables.
+- Recommendation intervals use a fixed-seed, 2,000-resample percentile bootstrap of application-level means.
+- The adjusted score subtracts the equally weighted mean application Recommendation within the same year and track; it does not adjust for all selection or judge-composition differences.
+- M=32 remains a detailed/exploratory view. Small, unstable, and explicitly mixed concepts are excluded from these headline selections.
+- No missing 2021 problem text is backfilled from solution or product descriptions.

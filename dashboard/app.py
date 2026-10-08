@@ -62,6 +62,10 @@ def load_bundle(m: int) -> dict[str, pd.DataFrame]:
         "disagreement": pd.read_csv(PATHS.tables / f"judge_disagreement_m{m}.csv"),
         "trends": pd.read_csv(PATHS.tables / f"trends_m{m}.csv"),
         "stability": pd.read_csv(PATHS.tables / f"concept_stability_m{m}.csv"),
+        "track_index": pd.read_csv(PATHS.tables / f"track_overrepresentation_m{m}.csv"),
+        "lead_gender": pd.read_csv(PATHS.tables / f"lead_gender_composition_m{m}.csv"),
+        "team_gender": pd.read_csv(PATHS.tables / f"team_gender_composition_m{m}.csv"),
+        "school_representation": pd.read_csv(PATHS.tables / f"school_representation_m{m}.csv"),
     }
 
 
@@ -86,13 +90,15 @@ def scope_summary(data: pd.DataFrame) -> pd.DataFrame:
     for (concept_id, label), group in data.groupby(["concept_id", "concept_label"]):
         annual = group.groupby("year")["application_id"].nunique().reindex(denominators.index, fill_value=0)
         shares = annual / denominators
-        slope = np.polyfit(shares.index, shares.values, 1)[0] if len(shares) >= 2 else np.nan
+        comparable = shares.loc[shares.index.isin([2022, 2023, 2024])]
+        slope = np.polyfit(comparable.index, comparable.values, 1)[0] if len(comparable) >= 2 else np.nan
         rows.append(
             {
                 "concept_id": int(concept_id), "concept_label": label,
                 "n_startups": group["application_id"].nunique(),
                 "prevalence": group["application_id"].nunique() / data["application_id"].nunique(),
                 "recommendation_mean": group["recommendation_mean"].mean(),
+                "recommendation_adjusted": group["recommendation_adjusted_year_track"].mean(),
                 "disagreement": group["recommendation_sd"].mean(), "trend": slope,
             }
         )
@@ -119,7 +125,7 @@ def constellation(summary: pd.DataFrame, overlap: pd.DataFrame) -> go.Figure:
         mode="markers+text", text=[label if len(label) < 32 else label[:30] + "…" for label in ordered["concept_label"]],
         textposition="top center",
         customdata=np.column_stack([ordered["concept_label"], ordered["n_startups"], ordered["recommendation_mean"], ordered["trend"]]),
-        hovertemplate="<b>%{customdata[0]}</b><br>Ventures: %{customdata[1]}<br>Recommendation: %{customdata[2]:.2f}<br>Trend: %{customdata[3]:+.2%}/yr<extra></extra>",
+        hovertemplate="<b>%{customdata[0]}</b><br>Applications: %{customdata[1]}<br>Raw Recommendation: %{customdata[2]:.2f}<br>2022–2024 trend: %{customdata[3]:+.2%}/yr<extra></extra>",
         marker={"size": 14 + 3 * np.sqrt(ordered["n_startups"]), "color": ordered["recommendation_mean"],
                 "colorscale": [[0, "#DCEAE7"], [0.55, TEAL], [1, CRIMSON]], "line": {"color": "white", "width": 2},
                 "colorbar": {"title": "Recommendation"}},
@@ -147,6 +153,7 @@ with st.sidebar:
     years = st.multiselect("Years", [2021, 2022, 2023, 2024], default=[2021, 2022, 2023, 2024])
     min_size = st.slider("Minimum primary-area size", 1, 25, 5)
     st.caption("Primary areas are used for maps. Full multi-concept activations remain in the analytical tables.")
+    st.warning("2021 has partial structured problem-text coverage (62/112). Trend headlines use 2022–2024.")
 
 primary = bundle["primary"].copy()
 if track != "All tracks":
@@ -172,23 +179,23 @@ tab_landscape, tab_problem, tab_track, tab_founder, tab_judge, tab_method = st.t
 
 with tab_landscape:
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Eligible ventures", f"{primary['application_id'].nunique():,}")
+    c1.metric("Eligible applications", f"{primary['application_id'].nunique():,}")
     c2.metric("Problem areas shown", f"{summary['concept_id'].nunique()}")
-    c3.metric("Mean recommendation", f"{primary['recommendation_mean'].mean():.2f}")
+    c3.metric("Raw mean Recommendation", f"{primary['recommendation_mean'].mean():.2f}")
     c4.metric("Mean judge disagreement", f"{primary['recommendation_sd'].mean():.2f}")
     st.plotly_chart(constellation(summary, bundle["overlap"]), width="stretch", config={"displayModeBar": False})
     opportunity = px.scatter(
-        summary, x="recommendation_mean", y="trend", size="n_startups", color="disagreement", text="concept_label",
+        summary, x="recommendation_adjusted", y="trend", size="n_startups", color="disagreement", text="concept_label",
         hover_name="concept_label", size_max=55, color_continuous_scale=["#DCEAE7", TEAL, CRIMSON],
         hover_data={"n_startups": True, "prevalence": ":.1%", "trend": ":+.2%"},
     )
     opportunity.update_traces(textposition="top center", marker={"line": {"color": "white", "width": 1.5}})
     opportunity.add_hline(y=0, line_dash="dot", line_color=SLATE)
-    opportunity.add_vline(x=summary["recommendation_mean"].median(), line_dash="dot", line_color=SLATE)
-    opportunity.update_xaxes(title="Mean startup Recommendation")
-    opportunity.update_yaxes(title="Annual change in portfolio share", tickformat="+.1%")
-    st.plotly_chart(style_figure(opportunity, "Strategic opportunity map", "Bubble size = ventures; color = judge disagreement"), width="stretch")
-    st.markdown('<div class="method-note">The taxonomy is outcome-independent. Recommendation and disagreement are descriptive overlays, and every point exposes its venture count.</div>', unsafe_allow_html=True)
+    opportunity.add_vline(x=summary["recommendation_adjusted"].median(), line_dash="dot", line_color=SLATE)
+    opportunity.update_xaxes(title="Year×track-adjusted application Recommendation")
+    opportunity.update_yaxes(title="Annual change in portfolio share, 2022–2024", tickformat="+.1%")
+    st.plotly_chart(style_figure(opportunity, "Strategic descriptive map", "Bubble size = applications; color = judge disagreement"), width="stretch")
+    st.markdown('<div class="method-note">The taxonomy is outcome-independent. Recommendation and disagreement are descriptive overlays, and every point exposes its application count.</div>', unsafe_allow_html=True)
 
 with tab_problem:
     group = primary.loc[primary["concept_id"].eq(selected_id)]
@@ -197,16 +204,16 @@ with tab_problem:
     st.subheader(selected_label)
     st.write(diagnostic["description"])
     p1, p2, p3, p4 = st.columns(4)
-    p1.metric("Ventures", f"{group['application_id'].nunique()}")
+    p1.metric("Applications", f"{group['application_id'].nunique()}")
     p2.metric("Portfolio share", f"{group['application_id'].nunique() / primary['application_id'].nunique():.1%}")
-    p3.metric("Recommendation", f"{group['recommendation_mean'].mean():.2f}")
-    p4.metric("Within-startup judge SD", f"{group['recommendation_sd'].mean():.2f}")
+    p3.metric("Raw Recommendation", f"{group['recommendation_mean'].mean():.2f}")
+    p4.metric("Adjusted Recommendation", f"{group['recommendation_adjusted_year_track'].mean():+.2f}")
     left, right = st.columns([1.25, 1])
     with left:
-        annual = group.groupby("year")["application_id"].nunique().reindex(years, fill_value=0).reset_index(name="ventures")
-        annual_fig = px.line(annual, x="year", y="ventures", markers=True, color_discrete_sequence=[CRIMSON])
+        annual = group.groupby("year")["application_id"].nunique().reindex(years, fill_value=0).reset_index(name="applications")
+        annual_fig = px.line(annual, x="year", y="applications", markers=True, color_discrete_sequence=[CRIMSON])
         annual_fig.update_xaxes(dtick=1)
-        st.plotly_chart(style_figure(annual_fig, "Venture attention over time", height=380), width="stretch")
+        st.plotly_chart(style_figure(annual_fig, "Application attention over time", "2021 has partial problem-text coverage", height=380), width="stretch")
     with right:
         dimensions = pd.DataFrame(
             {
@@ -221,8 +228,8 @@ with tab_problem:
         st.plotly_chart(style_figure(score_fig, "Judging profile", height=380), width="stretch")
     dist_left, dist_right = st.columns(2)
     with dist_left:
-        tracks = group["Track"].value_counts().reset_index(name="ventures")
-        st.plotly_chart(style_figure(px.bar(tracks, x="Track", y="ventures", color_discrete_sequence=[CRIMSON]), "Track mix", height=350), width="stretch")
+        tracks = group["Track"].value_counts().reset_index(name="applications")
+        st.plotly_chart(style_figure(px.bar(tracks, x="Track", y="applications", color_discrete_sequence=[CRIMSON]), "Track mix", height=350), width="stretch")
     with dist_right:
         schools = bundle["founders"].loc[bundle["founders"]["application_id"].isin(group["application_id"]), "harvard_school"].fillna("Missing").value_counts().head(10).reset_index(name="founders")
         st.plotly_chart(style_figure(px.bar(schools, x="founders", y="harvard_school", orientation="h", color_discrete_sequence=[GOLD]), "Founder school mix", height=350), width="stretch")
@@ -238,32 +245,41 @@ with tab_track:
     totals = all_primary.groupby("Track")["application_id"].nunique().rename("total").reset_index()
     matrix = matrix.merge(totals, on="Track")
     matrix["share"] = matrix["n"] / matrix["total"]
-    pivot = matrix.pivot(index="concept_label", columns="Track", values="share").fillna(0)
-    track_fig = go.Figure(go.Heatmap(z=pivot.values, x=pivot.columns, y=pivot.index, colorscale=[[0, "white"], [1, CRIMSON]], text=np.round(pivot.values * 100, 1), texttemplate="%{text}%", colorbar={"title": "share"}))
-    st.plotly_chart(style_figure(track_fig, "Track emphasis by problem area", "Column-normalized shares; years follow the global filter", max(600, 34 * len(pivot))), width="stretch")
+    overall = all_primary.groupby("concept_label")["application_id"].nunique().div(all_primary["application_id"].nunique()).rename("overall_share")
+    matrix = matrix.merge(overall, on="concept_label")
+    matrix["overrepresentation_ratio"] = matrix["share"] / matrix["overall_share"]
+    pivot = matrix.pivot(index="concept_label", columns="Track", values="overrepresentation_ratio").fillna(0)
+    track_fig = go.Figure(go.Heatmap(z=pivot.values, x=pivot.columns, y=pivot.index, colorscale=[[0, "white"], [0.5, GOLD], [1, CRIMSON]], zmid=1, text=np.round(pivot.values, 2), texttemplate="%{text}×", colorbar={"title": "index"}))
+    st.plotly_chart(style_figure(track_fig, "Track signature by problem area", "Relative concentration: 1.0 = portfolio baseline; this is not venture quality", max(600, 34 * len(pivot))), width="stretch")
 
 with tab_founder:
-    founders = bundle["founders"].loc[bundle["founders"]["application_id"].isin(primary["application_id"])]
-    school = founders.groupby(["harvard_school", "concept_label"]).size().rename("n").reset_index()
-    school = school.loc[school["harvard_school"].fillna("Missing").ne("Missing")]
-    top_schools = school.groupby("harvard_school")["n"].sum().nlargest(12).index
+    school_view = st.radio("School view", ["Representation index", "Raw counts"], horizontal=True)
+    school = bundle["school_representation"].loc[bundle["school_representation"]["concept_id"].isin(summary["concept_id"])]
+    top_schools = school.groupby("harvard_school")["n_founders"].sum().nlargest(12).index
     school = school.loc[school["harvard_school"].isin(top_schools)]
-    school_pivot = school.pivot(index="harvard_school", columns="concept_label", values="n").fillna(0)
-    school_fig = go.Figure(go.Heatmap(z=school_pivot.values, x=school_pivot.columns, y=school_pivot.index, colorscale=[[0, "white"], [1, CRIMSON]], colorbar={"title": "founders"}))
-    st.plotly_chart(style_figure(school_fig, "School × problem area", "Counts of supplied founder/team records", 560), width="stretch")
-    gender = founders.groupby(["concept_label", "gender"]).size().rename("n").reset_index()
-    gender["share"] = gender["n"] / gender.groupby("concept_label")["n"].transform("sum")
-    gender_fig = px.bar(gender, x="share", y="concept_label", color="gender", orientation="h", color_discrete_sequence=[CRIMSON, TEAL, GOLD, SLATE, "#B9B2A5"])
+    school_value = "representation_index" if school_view == "Representation index" else "n_founders"
+    school_pivot = school.pivot(index="harvard_school", columns="concept_label", values=school_value).fillna(0)
+    school_fig = go.Figure(go.Heatmap(z=school_pivot.values, x=school_pivot.columns, y=school_pivot.index, colorscale=[[0, "white"], [1, CRIMSON]], zmid=1 if school_view == "Representation index" else None, colorbar={"title": "index" if school_view == "Representation index" else "founders"}))
+    st.plotly_chart(style_figure(school_fig, "School × problem area", "Representation index defaults to 1.0 = reported-founder portfolio baseline", 560), width="stretch")
+    gender_view = st.radio("Gender view", ["Lead applicant", "Team-reported"], horizontal=True)
+    if gender_view == "Lead applicant":
+        gender = bundle["lead_gender"].rename(columns={"lead_gender": "gender", "n_applications": "n"})
+        caption = "Application-level Gender field; no inference from names"
+    else:
+        gender = bundle["team_gender"].rename(columns={"n_founders": "n"})
+        caption = "Secondary team-reported view; reporting coverage is substantially lower"
+    gender = gender.loc[gender["concept_id"].isin(summary["concept_id"])]
+    gender_fig = px.bar(gender, x="share_among_reported", y="concept_label", color="gender", orientation="h", color_discrete_sequence=[CRIMSON, TEAL, GOLD, SLATE, "#B9B2A5"], hover_data={"n": True, "reporting_coverage": ":.1%"})
     gender_fig.update_xaxes(tickformat=".0%")
-    st.plotly_chart(style_figure(gender_fig, "Gender representation", "Supplied variables only; missing retained", max(560, 35 * gender["concept_label"].nunique())), width="stretch")
+    st.plotly_chart(style_figure(gender_fig, "Gender representation", caption, max(560, 35 * gender["concept_label"].nunique())), width="stretch")
 
 with tab_judge:
     disagree = primary.groupby(["concept_id", "concept_label"]).agg(
-        recommendation=("recommendation_mean", "mean"), disagreement=("recommendation_sd", "mean"), ventures=("application_id", "nunique")
+        recommendation=("recommendation_mean", "mean"), disagreement=("recommendation_sd", "mean"), applications=("application_id", "nunique")
     ).reset_index()
-    dfig = px.scatter(disagree, x="recommendation", y="disagreement", size="ventures", text="concept_label", hover_name="concept_label", size_max=55, color="disagreement", color_continuous_scale=[TEAL, GOLD, CRIMSON])
+    dfig = px.scatter(disagree, x="recommendation", y="disagreement", size="applications", text="concept_label", hover_name="concept_label", size_max=55, color="disagreement", color_continuous_scale=[TEAL, GOLD, CRIMSON])
     dfig.update_traces(textposition="top center")
-    st.plotly_chart(style_figure(dfig, "Recommendation × judge disagreement", "Each startup contributes one mean and one within-startup SD"), width="stretch")
+    st.plotly_chart(style_figure(dfig, "Recommendation × judge disagreement", "Each application contributes one mean and one within-application SD"), width="stretch")
     intervention = bundle["intervention"].loc[bundle["intervention"]["concept_id"].isin(summary["concept_id"])]
     zcols = ["problem_customer_definition_z", "solution_prototype_z", "business_model_z", "impact_z"]
     heat = go.Figure(go.Heatmap(z=intervention[zcols].values, x=["Problem", "Prototype", "Business model", "Impact"], y=intervention["concept_label"], colorscale="RdBu", zmid=0, text=np.round(intervention[zcols].values, 2), texttemplate="%{text}"))
@@ -282,7 +298,7 @@ with tab_method:
         2. Constructs `problem_text` only from structured customer/stakeholder and problem/need fields. Generic venture descriptions are never used as a fallback.
         3. Embeds text locally with `nomic-ai/modernbert-embed-base` and trains the pinned HypotheSAEs top-K sparse autoencoder with K=4 at M=16 and M=32.
         4. Reviews strongest and moderate activations for every feature and flags mixed, geographic, solution-like, or small-N features.
-        5. Adds startup-weighted judging, founder, track, and year overlays only after concept learning.
+        5. Adds application-weighted judging, founder, track, and year overlays only after concept learning.
         """
     )
     a1, a2, a3 = st.columns(3)

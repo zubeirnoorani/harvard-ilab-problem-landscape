@@ -1,6 +1,6 @@
 # Harvard i-lab Problem Landscape
 
-This repository builds a reproducible, demand-side view of Harvard Innovation Labs President's Innovation Challenge applications from 2021–2024. It groups venture applications by the customer problem they address, not by technology, product, solution, or industry, and then overlays judging outcomes and founder composition.
+This repository builds a reproducible, demand-side view of Harvard Innovation Labs President's Innovation Challenge applications from 2021–2024. It groups application-year observations by the customer problem they address—not by technology, product, solution, or industry—and then overlays judging outcomes and founder composition.
 
 ## Data structure
 
@@ -15,8 +15,11 @@ Place the supplied export at `data/merged_clean.csv`. That path is ignored by Gi
 3. Build deterministic demand-side `problem_text` from structured problem and customer/stakeholder fields only.
 4. Embed problem text locally and train outcome-independent HypotheSAEs models at M=16 and M=32, K=4.
 5. Review every feature's strongest and moderate activators before marking it leadership-ready.
-6. Overlay judging outcomes, trends, disagreement, judge type, school, gender, geography, and industry.
-7. Generate figures, problem profiles, meeting findings, and the Streamlit prototype.
+6. Center each application’s Recommendation within its year and track, then aggregate raw and adjusted outcomes with application-level bootstrap confidence intervals.
+7. Overlay 2022–2024 trends, disagreement, founder-support rubric gaps, track over-indexing, lead/team gender, normalized school representation, geography, and industry.
+8. Generate figures, problem profiles, meeting findings, and the Streamlit prototype.
+
+The default leadership taxonomy is M=16 with primary assignment. M=32 is retained as a detailed/exploratory view, and full overlapping SAE membership remains available in the analytical tables.
 
 ## Setup
 
@@ -55,7 +58,7 @@ The disclosure-controlled leadership view is deployed at:
 
 <https://harvard-ilab-problem-landscape.vercel.app>
 
-The hosted research atlas includes aggregated and track-specific landscapes, M=16/M=32 and primary/overlapping concept views, year filters, problem profiles, judging dimensions, trends, judge disagreement and type, gender, Harvard school, geography, industry, model validation, and data coverage. It contains aggregate cells only and suppresses cells below 10 observations. It does not publish application text, venture names, application IDs, row-level founder attributes, embeddings, activations, or checkpoints. Rebuild its payload after regenerating the analytical outputs with:
+The hosted decision-support prototype includes an executive leadership summary, 2022–2024 attention trends, raw and year×track-adjusted Recommendation, application-level bootstrap intervals, a portfolio-wide “Where can i-lab help?” view, actionable signals, track signatures, lead-applicant and team-reported gender views, normalized school representation, judge disagreement, concept quality badges, and drill-down Problem Profiles. It contains aggregate cells only and suppresses cells below 10 observations. It does not publish application text, venture names, application IDs, row-level founder attributes, embeddings, activations, or checkpoints. Rebuild its payload after regenerating the analytical outputs with:
 
 ```bash
 .venv/bin/python scripts/build_public_payload.py
@@ -73,21 +76,31 @@ Raw data, row-level derivatives, problem excerpts, embeddings, activations, chec
 
 The public repository contains reproducible code, empty notebooks, disclosure-controlled aggregate reports, and a hosted payload whose analytical cells satisfy N ≥ 10. Access to the confidential source export is still required to reproduce the private row-level and model artifacts locally.
 
+## Longitudinal and evaluation interpretation
+
+2021 is preserved as historical context but has partial structured problem-text coverage: 62 of 112 applications are usable (HLS 14/20, Open 20/42, Social Impact 28/50). The default growth and emerging-problem fields are therefore `trend_slope_2022_2024` and `change_2022_to_2024`. Four-year research fields remain available as `trend_slope_2021_2024_partial` and `change_2021_to_2024_partial` and are visibly labeled as partial coverage.
+
+`recommendation_adjusted_year_track` is calculated after judge-to-application aggregation by subtracting the equally weighted mean application Recommendation in the same year and track. This supports more defensible relative comparisons across problem areas but is descriptive, not causal. Raw Recommendation / 5 remains visible. Published concept means include fixed-seed, 2,000-resample application-level percentile bootstrap 95% confidence intervals.
+
 ## Known limitations
 
 - Fifty 2021 applications lack structured problem/customer fields and are not backfilled from solution-heavy descriptions.
 - Some official track labels disagree with the form family populated by the applicant; the pipeline logs these cases.
 - Returning ventures are separate application-year observations.
 - SAE features overlap and are not mutually exclusive clusters. `primary_problem_concept` exists only for views that require one assignment.
-- Trends cover four annual observations and are descriptive.
+- Default trends cover only three annual observations (2022–2024) and remain descriptive; 2021 partial-coverage metrics are research detail.
+- Adjusted Recommendation controls only for year×track mean differences, not applicant selection, judge composition, or unobserved confounding.
+- Bootstrap intervals describe uncertainty in application-level means and should not be read as automatic evidence that areas differ significantly.
 - M=32 contains several mixed or geography-driven features; M=16 is the default leadership view, while both remain available for inspection.
 
 ## Key outputs
 
 - `outputs/DATA_AUDIT.md` — identifier, field, coverage, duplicate, and missingness audit.
-- `outputs/tables/startup_level.csv` — one row per application with startup-weighted judging aggregates.
+- `outputs/tables/startup_level.csv` — one row per application with application-weighted judging aggregates.
 - `outputs/tables/problem_text.csv` — deterministic demand-side text and quality flags.
 - `outputs/tables/concept_diagnostics_m16.csv` and `concept_diagnostics_m32.csv` — reviewed concepts and examples.
+- `outputs/tables/track_overrepresentation_m16.csv` — track shares, portfolio shares, and relative-concentration ratios.
+- `outputs/tables/lead_gender_composition_m16.csv`, `team_gender_composition_m16.csv`, and `school_representation_m16.csv` — founder representation with explicit coverage/baselines.
 - `outputs/figures/` — interactive and static landscape, trend, evaluation, composition, and intervention views.
 - `outputs/profiles/` — reusable example Problem Profiles.
 - `outputs/FRIDAY_MEETING_FINDINGS.md` — concise leadership discussion findings.

@@ -52,14 +52,17 @@ def _strategic_for_scope(primary: pd.DataFrame, track_scope: str) -> pd.DataFram
         counts = group.groupby("year")["application_id"].nunique().reindex(VALID_YEARS, fill_value=0)
         denominators = scope.groupby("year")["application_id"].nunique().reindex(VALID_YEARS, fill_value=0)
         shares = counts / denominators.replace(0, np.nan)
-        valid = shares.notna()
-        slope = np.polyfit(np.asarray(VALID_YEARS)[valid], shares[valid], 1)[0] if valid.sum() >= 2 else np.nan
+        default_years = np.asarray([2022, 2023, 2024])
+        default_shares = shares.reindex(default_years)
+        valid = default_shares.notna()
+        slope = np.polyfit(default_years[valid], default_shares[valid], 1)[0] if valid.sum() >= 2 else np.nan
         rows.append(
             {
                 "concept_id": int(concept_id), "concept_label": concept_label,
                 "n_startups": int(group["application_id"].nunique()),
                 "prevalence": group["application_id"].nunique() / scope["application_id"].nunique(),
                 "recommendation_mean": group["recommendation_mean"].mean(),
+                "recommendation_adjusted_year_track_mean": group["recommendation_adjusted_year_track"].mean(),
                 "judge_disagreement": group["recommendation_sd"].mean(),
                 "trend_slope": slope,
             }
@@ -71,25 +74,25 @@ def opportunity_map(primary: pd.DataFrame, m_concepts: int, track_scope: str = "
     data = _strategic_for_scope(primary, track_scope)
     fig = px.scatter(
         data,
-        x="recommendation_mean",
+        x="recommendation_adjusted_year_track_mean",
         y="trend_slope",
         size="n_startups",
         color="judge_disagreement",
         text="concept_label",
         hover_name="concept_label",
-        hover_data={"n_startups": True, "prevalence": ":.1%", "recommendation_mean": ":.2f", "trend_slope": ":+.2%", "judge_disagreement": ":.2f"},
+        hover_data={"n_startups": True, "prevalence": ":.1%", "recommendation_mean": ":.2f", "recommendation_adjusted_year_track_mean": ":+.2f", "trend_slope": ":+.2%", "judge_disagreement": ":.2f"},
         color_continuous_scale=["#DCEAE7", TEAL, CRIMSON],
         size_max=55,
     )
     fig.update_traces(textposition="top center", textfont_size=10, marker={"line": {"color": "white", "width": 1.5}})
     fig.add_hline(y=0, line_dash="dot", line_color=SLATE)
-    fig.add_vline(x=data["recommendation_mean"].median(), line_dash="dot", line_color=SLATE)
-    fig.update_xaxes(title="Mean startup Recommendation (1–5)")
-    fig.update_yaxes(title="Annual change in portfolio share")
+    fig.add_vline(x=data["recommendation_adjusted_year_track_mean"].median(), line_dash="dot", line_color=SLATE)
+    fig.update_xaxes(title="Year×track-adjusted application Recommendation")
+    fig.update_yaxes(title="Annual change in portfolio share, 2022–2024")
     apply_plotly_style(
         fig,
         f"Problem opportunity map · {track_scope}",
-        f"M={m_concepts}; bubble size = primary-area ventures; color = judge disagreement. Descriptive, not causal.",
+        f"M={m_concepts}; bubble size = primary-area applications; color = judge disagreement. Descriptive, not causal.",
     )
     _save(fig, f"opportunity_map_m{m_concepts}_{track_scope.lower().replace(' ', '_').replace('&', 'and')}")
     return fig
@@ -98,14 +101,14 @@ def opportunity_map(primary: pd.DataFrame, m_concepts: int, track_scope: str = "
 def prevalence_rating_map(primary: pd.DataFrame, m_concepts: int) -> go.Figure:
     data = _strategic_for_scope(primary, "All tracks")
     fig = px.scatter(
-        data, x="prevalence", y="recommendation_mean", size="n_startups", color="trend_slope",
+        data, x="prevalence", y="recommendation_adjusted_year_track_mean", size="n_startups", color="trend_slope",
         text="concept_label", hover_name="concept_label", color_continuous_scale="RdBu",
         color_continuous_midpoint=0, size_max=55,
     )
     fig.update_traces(textposition="top center", textfont_size=10)
     fig.update_xaxes(title="Share of eligible portfolio", tickformat=".0%")
-    fig.update_yaxes(title="Mean startup Recommendation (1–5)")
-    apply_plotly_style(fig, "Attention × evaluation", f"M={m_concepts}; color = annual change in portfolio share")
+    fig.update_yaxes(title="Year×track-adjusted application Recommendation")
+    apply_plotly_style(fig, "Attention × evaluation", f"M={m_concepts}; color = 2022–2024 annual change in portfolio share")
     _save(fig, f"prevalence_rating_m{m_concepts}")
     return fig
 
@@ -119,8 +122,8 @@ def trend_figure(primary: pd.DataFrame, m_concepts: int, top_n: int = 10) -> go.
     data = data.loc[data["concept_label"].isin(largest)]
     fig = px.line(data, x="year", y="share", color="concept_label", markers=True, hover_data={"n": True, "share": ":.1%"})
     fig.update_xaxes(dtick=1, title="Competition year")
-    fig.update_yaxes(title="Share of eligible startups", tickformat=".0%")
-    apply_plotly_style(fig, "How entrepreneurial attention changed", f"Ten largest primary problem areas · M={m_concepts}")
+    fig.update_yaxes(title="Share of eligible applications", tickformat=".0%")
+    apply_plotly_style(fig, "How entrepreneurial attention changed", f"Ten largest primary problem areas · M={m_concepts}; 2021 has partial problem-text coverage")
     _save(fig, f"year_trends_m{m_concepts}")
     return fig
 
@@ -140,7 +143,7 @@ def judging_heatmap(intervention: pd.DataFrame, m_concepts: int, standardized: b
         labels = ["Problem / customer", "Solution / prototype", "Business model", "Impact"]
         zmid, colors = None, [[0, "#F4E5E8"], [0.5, "#F7F3EA"], [1, TEAL]]
         title = "Judging scores by problem area"
-        subtitle = "Equal startup weighting; raw mean scores on 1–5 scale"
+        subtitle = "Equal application weighting; raw mean scores on 1–5 scale"
     data = intervention.sort_values("problem_customer_definition_mean_mean")
     matrix = data[columns].to_numpy()
     fig = go.Figure(
@@ -169,9 +172,9 @@ def disagreement_figure(disagreement: pd.DataFrame, m_concepts: int) -> go.Figur
         },
     )
     fig.update_traces(textposition="top center", textfont_size=10)
-    fig.update_xaxes(title="Mean startup Recommendation")
-    fig.update_yaxes(title="Mean within-startup Recommendation SD")
-    apply_plotly_style(fig, "Where judges agree—and disagree", f"M={m_concepts}; bubble size = startups")
+    fig.update_xaxes(title="Mean application Recommendation")
+    fig.update_yaxes(title="Mean within-application Recommendation SD")
+    apply_plotly_style(fig, "Where judges agree—and disagree", f"M={m_concepts}; bubble size = applications")
     _save(fig, f"judge_disagreement_m{m_concepts}")
     return fig
 
@@ -180,16 +183,16 @@ def school_problem_heatmap(school_table: pd.DataFrame, m_concepts: int) -> go.Fi
     clean = school_table.loc[school_table["harvard_school"].ne("Missing")].copy()
     common_schools = clean.groupby("harvard_school")["n_founders"].sum().nlargest(12).index
     clean = clean.loc[clean["harvard_school"].isin(common_schools)]
-    matrix = clean.pivot_table(index="harvard_school", columns="concept_label", values="share_within_problem", fill_value=0)
+    matrix = clean.pivot_table(index="harvard_school", columns="concept_label", values="representation_index", fill_value=0)
     fig = go.Figure(
         go.Heatmap(
             z=matrix.to_numpy(), x=matrix.columns, y=matrix.index, colorscale=[[0, "#FFFFFF"], [1, CRIMSON]],
-            colorbar={"title": "share"}, hovertemplate="%{y}<br>%{x}<br>%{z:.1%}<extra></extra>",
+            colorbar={"title": "index"}, hovertemplate="%{y}<br>%{x}<br>representation index %{z:.2f}<extra></extra>",
         )
     )
     fig.update_layout(height=600)
     fig.update_xaxes(tickangle=-35)
-    apply_plotly_style(fig, "Harvard school × problem area", f"Founder share within each primary area · M={m_concepts}; missing shown separately in data")
+    apply_plotly_style(fig, "Harvard school × problem area", f"Representation index (1.0 = portfolio baseline) · M={m_concepts}; cells N<10 should be interpreted cautiously")
     _save(fig, f"school_problem_matrix_m{m_concepts}")
     return fig
 
@@ -197,14 +200,14 @@ def school_problem_heatmap(school_table: pd.DataFrame, m_concepts: int) -> go.Fi
 def gender_figure(gender_table: pd.DataFrame, m_concepts: int) -> go.Figure:
     data = gender_table.copy()
     fig = px.bar(
-        data, x="share_within_problem", y="concept_label", color="gender", orientation="h",
-        hover_data={"n_founders": True, "share_within_problem": ":.1%"},
+        data, x="share_among_reported", y="concept_label", color="lead_gender", orientation="h",
+        hover_data={"n_applications": True, "share_among_reported": ":.1%", "reporting_coverage": ":.1%"},
         color_discrete_sequence=[CRIMSON, TEAL, GOLD, SLATE, "#B9B2A5"],
     )
     fig.update_xaxes(title="Share of observed founder records", tickformat=".0%")
     fig.update_yaxes(title=None)
     fig.update_layout(barmode="stack", height=max(650, 35 * data["concept_label"].nunique()))
-    apply_plotly_style(fig, "Gender representation by problem area", f"Supplied gender variables only; missing retained · M={m_concepts}")
+    apply_plotly_style(fig, "Lead applicant gender by problem area", f"Application-level Gender field; reporting coverage shown in hover; no inference · M={m_concepts}")
     _save(fig, f"gender_problem_m{m_concepts}")
     return fig
 
@@ -236,9 +239,9 @@ def problem_constellation(
         text=[textwrap.shorten(label, width=30, placeholder="…") for label in ordered["concept_label"]],
         textposition="top center",
         customdata=np.column_stack([
-            ordered["concept_label"], ordered["n_startups"], ordered["recommendation_mean"], ordered["trend_slope_share_per_year"]
+            ordered["concept_label"], ordered["n_startups"], ordered["recommendation_mean"], ordered["trend_slope_2022_2024"]
         ]),
-        hovertemplate="<b>%{customdata[0]}</b><br>Ventures: %{customdata[1]}<br>Recommendation: %{customdata[2]:.2f}<br>Trend: %{customdata[3]:+.2%}/yr<extra></extra>",
+        hovertemplate="<b>%{customdata[0]}</b><br>Applications: %{customdata[1]}<br>Recommendation: %{customdata[2]:.2f}<br>2022–2024 trend: %{customdata[3]:+.2%}/yr<extra></extra>",
         marker={
             "size": 14 + 2.2 * np.sqrt(ordered["n_startups"]),
             "color": ordered["recommendation_mean"],
@@ -260,21 +263,21 @@ def _static_opportunity(primary: pd.DataFrame, m_concepts: int) -> None:
     data = _strategic_for_scope(primary, "All tracks")
     fig, ax = plt.subplots(figsize=(13, 9), facecolor="white")
     scatter = ax.scatter(
-        data["recommendation_mean"], data["trend_slope"],
+        data["recommendation_adjusted_year_track_mean"], data["trend_slope"],
         s=70 + data["n_startups"] * 18, c=data["judge_disagreement"], cmap="RdYlBu_r",
         alpha=0.85, edgecolor="white", linewidth=1.5,
     )
     for _, row in data.iterrows():
-        ax.annotate(textwrap.fill(row["concept_label"], 22), (row["recommendation_mean"], row["trend_slope"]), xytext=(5, 5), textcoords="offset points", fontsize=8)
+        ax.annotate(textwrap.fill(row["concept_label"], 22), (row["recommendation_adjusted_year_track_mean"], row["trend_slope"]), xytext=(5, 5), textcoords="offset points", fontsize=8)
     ax.axhline(0, color=SLATE, linestyle=":")
-    ax.axvline(data["recommendation_mean"].median(), color=SLATE, linestyle=":")
-    ax.set_xlabel("Mean startup Recommendation (1–5)")
-    ax.set_ylabel("Annual change in portfolio share")
+    ax.axvline(data["recommendation_adjusted_year_track_mean"].median(), color=SLATE, linestyle=":")
+    ax.set_xlabel("Year×track-adjusted application Recommendation")
+    ax.set_ylabel("Annual change in portfolio share, 2022–2024")
     ax.set_title(f"Harvard i-lab problem opportunity map · M={m_concepts}", loc="left", color=INK, fontsize=18, pad=20)
     ax.grid(color="#E7E2D8", linewidth=0.7)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    fig.colorbar(scatter, ax=ax, label="Mean within-startup Recommendation SD")
+    fig.colorbar(scatter, ax=ax, label="Mean within-application Recommendation SD")
     fig.tight_layout()
     fig.savefig(PATHS.figures / f"opportunity_map_m{m_concepts}.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
@@ -284,8 +287,8 @@ def generate_all_visualizations(m_concepts: int) -> dict[str, go.Figure]:
     primary = pd.read_csv(PATHS.tables / f"primary_problem_areas_m{m_concepts}.csv", low_memory=False)
     intervention = pd.read_csv(PATHS.tables / f"intervention_profiles_m{m_concepts}.csv")
     disagreement = pd.read_csv(PATHS.tables / f"judge_disagreement_m{m_concepts}.csv")
-    school = pd.read_csv(PATHS.tables / f"composition_harvard_school_m{m_concepts}.csv")
-    gender = pd.read_csv(PATHS.tables / f"composition_gender_m{m_concepts}.csv")
+    school = pd.read_csv(PATHS.tables / f"school_representation_m{m_concepts}.csv")
+    gender = pd.read_csv(PATHS.tables / f"lead_gender_composition_m{m_concepts}.csv")
     strategic = pd.read_csv(PATHS.tables / f"strategic_map_m{m_concepts}.csv")
     overlap = pd.read_csv(PATHS.tables / f"concept_overlap_m{m_concepts}.csv")
     figures = {

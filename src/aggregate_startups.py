@@ -38,6 +38,20 @@ def coerce_rating(series: pd.Series) -> pd.Series:
     return numeric.where(numeric.between(1, 5))
 
 
+def add_year_track_adjusted_recommendation(applications: pd.DataFrame) -> pd.DataFrame:
+    """Center application means within their year and official track.
+
+    This is intentionally applied after judge rows have been reconciled and
+    aggregated so every application contributes once to its year/track mean.
+    """
+    out = applications.copy()
+    recommendation = pd.to_numeric(out["recommendation_mean"], errors="coerce")
+    group_mean = recommendation.groupby([out["year"], out["Track"]]).transform("mean")
+    out["recommendation_year_track_mean"] = group_mean
+    out["recommendation_adjusted_year_track"] = recommendation - group_mean
+    return out
+
+
 def validate_application_stability(df: pd.DataFrame) -> pd.DataFrame:
     issues = []
     for col in [c for c in APPLICATION_COLUMNS if c in df.columns and c != "Submission ID"]:
@@ -128,6 +142,7 @@ def build_startup_level(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, p
     outcomes = pd.concat(stats, axis=1).reset_index()
     judge_counts = valid.groupby("application_id")["judge_id"].nunique().rename("n_unique_judges").reset_index()
     startup = applications.merge(outcomes, on="application_id", how="left").merge(judge_counts, on="application_id", how="left")
+    startup = add_year_track_adjusted_recommendation(startup)
     if startup["application_id"].duplicated().any():
         raise AssertionError("Startup-level output is not one row per application")
     return startup, judge, issues

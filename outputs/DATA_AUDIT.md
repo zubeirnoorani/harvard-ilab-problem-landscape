@@ -36,6 +36,25 @@
 - Field availability by year and track is explicitly tabulated in `application_field_coverage.csv`; the structured application form changes materially after 2021.
 - The source contains direct identifiers and free text. All row-level outputs remain local and gitignored.
 
+## Structured problem-text coverage and longitudinal comparability
+
+2021 has partial structured problem-text coverage (62 of 112 applications) and is preserved as historical context, not treated as fully comparable with 2022–2024. Default growth and decline metrics therefore use 2022–2024; four-year metrics are explicitly labeled partial coverage.
+
+|   year | Track                 |   applications_total |   usable_problem_text |   coverage_share |
+|-------:|:----------------------|---------------------:|----------------------:|-----------------:|
+|   2021 | Health & Life Science |                   20 |                    14 |          0.7     |
+|   2021 | Open                  |                   42 |                    20 |          0.47619 |
+|   2021 | Social Impact         |                   50 |                    28 |          0.56    |
+|   2022 | Health & Life Science |                   25 |                    25 |          1       |
+|   2022 | Open                  |                   57 |                    57 |          1       |
+|   2022 | Social Impact         |                   56 |                    56 |          1       |
+|   2023 | Health & Life Science |                   29 |                    29 |          1       |
+|   2023 | Open                  |                   56 |                    56 |          1       |
+|   2023 | Social Impact         |                   41 |                    41 |          1       |
+|   2024 | Health & Life Science |                   30 |                    30 |          1       |
+|   2024 | Open                  |                   52 |                    52 |          1       |
+|   2024 | Social Impact         |                   51 |                    51 |          1       |
+
 ## Year and track counts
 
 |   year | Track                 |   judge_rows |   applications |
