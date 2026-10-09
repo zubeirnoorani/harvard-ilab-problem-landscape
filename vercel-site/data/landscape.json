@@ -35278,6 +35278,817 @@
       ]
     }
   },
+  "meeting": {
+    "taxonomy": "M=16 primary assignment",
+    "defaultProblemId": 7,
+    "fullAtlasRoute": "/atlas",
+    "trackDenominators": {
+      "Health & Life Sciences": 98,
+      "Open": 185,
+      "Social Impact": 176
+    },
+    "problems": [
+      {
+        "id": 7,
+        "label": "Equitable K–12 learning and student support",
+        "description": "Schools, teachers, and families struggle to provide engaging, equitable learning and whole-student support.",
+        "n": 78,
+        "share": 0.1699,
+        "tracks": {
+          "Open": {
+            "suppressed": false,
+            "n": 19,
+            "share": 0.1027
+          },
+          "Social Impact": {
+            "suppressed": false,
+            "n": 59,
+            "share": 0.3352
+          },
+          "Health & Life Sciences": {
+            "suppressed": true
+          }
+        },
+        "years": [
+          {
+            "year": 2021,
+            "coverage": "partial",
+            "coverageLabel": "Partial problem-text coverage",
+            "suppressed": false,
+            "n": 14,
+            "share": 0.2258
+          },
+          {
+            "year": 2022,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 28,
+            "share": 0.2029
+          },
+          {
+            "year": 2023,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 19,
+            "share": 0.1508
+          },
+          {
+            "year": 2024,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 17,
+            "share": 0.1278
+          }
+        ],
+        "schools": [
+          {
+            "label": "Non-Harvard affiliate",
+            "n": 87,
+            "share": 0.4307,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Graduate School of Education",
+            "n": 35,
+            "share": 0.1733,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard College",
+            "n": 17,
+            "share": 0.0842,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Business School",
+            "n": 14,
+            "share": 0.0693,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Kennedy School",
+            "n": 13,
+            "share": 0.0644,
+            "unit": "founder records"
+          }
+        ],
+        "schoolSuppressedCells": 9,
+        "leadGender": {
+          "reportedN": 78,
+          "problemN": 78,
+          "reportingCoverage": 1.0,
+          "groups": [
+            {
+              "label": "Female",
+              "n": 37,
+              "shareAmongReported": 0.4744
+            },
+            {
+              "label": "Male",
+              "n": 40,
+              "shareAmongReported": 0.5128
+            }
+          ],
+          "evaluation": {
+            "available": true,
+            "differenceLabel": "Evaluation difference within this problem",
+            "adjustedDifferenceFemaleMinusMale": 0.054,
+            "adjustedDifferenceCiLow": -0.154,
+            "adjustedDifferenceCiHigh": 0.2555,
+            "groups": [
+              {
+                "label": "Female",
+                "n": 37,
+                "rawMean": 3.4678,
+                "rawCiLow": 3.3007,
+                "rawCiHigh": 3.6302,
+                "adjustedMean": 0.0128,
+                "adjustedCiLow": -0.1517,
+                "adjustedCiHigh": 0.1732
+              },
+              {
+                "label": "Male",
+                "n": 40,
+                "rawMean": 3.3579,
+                "rawCiLow": 3.2109,
+                "rawCiHigh": 3.504,
+                "adjustedMean": -0.0413,
+                "adjustedCiLow": -0.1766,
+                "adjustedCiHigh": 0.0883
+              }
+            ]
+          }
+        },
+        "support": {
+          "n": 78,
+          "problem": 3.8831,
+          "business": 2.886,
+          "gap": 0.997,
+          "observed": "Problem & Customer Definition is higher than Business Model in historical application ratings.",
+          "theme": "Buyer discovery / pilot partnerships",
+          "question": "Could shared buyer-discovery and pilot-partner access help education teams test who buys, how procurement works, and what a useful pilot looks like?",
+          "validation": "Ask founders whether buyer access and procurement are actually the binding constraints.",
+          "interpretation": "Proposed interpretation to validate; not a measured intervention effect."
+        }
+      },
+      {
+        "id": 15,
+        "label": "Living better with chronic and neurological conditions",
+        "description": "People with chronic, neurological, or mental-health conditions and their caregivers lack effective support for function, independence, and quality of life.",
+        "n": 55,
+        "share": 0.1198,
+        "tracks": {
+          "Open": {
+            "suppressed": true
+          },
+          "Social Impact": {
+            "suppressed": false,
+            "n": 11,
+            "share": 0.0625
+          },
+          "Health & Life Sciences": {
+            "suppressed": false,
+            "n": 38,
+            "share": 0.3878
+          }
+        },
+        "years": [
+          {
+            "year": 2021,
+            "coverage": "partial",
+            "coverageLabel": "Partial problem-text coverage",
+            "suppressed": true
+          },
+          {
+            "year": 2022,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 17,
+            "share": 0.1232
+          },
+          {
+            "year": 2023,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 16,
+            "share": 0.127
+          },
+          {
+            "year": 2024,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 18,
+            "share": 0.1353
+          }
+        ],
+        "schools": [
+          {
+            "label": "Non-Harvard affiliate",
+            "n": 65,
+            "share": 0.3963,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Medical School",
+            "n": 27,
+            "share": 0.1646,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Business School",
+            "n": 20,
+            "share": 0.122,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard T.H. Chan School of Public Health",
+            "n": 14,
+            "share": 0.0854,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard College",
+            "n": 10,
+            "share": 0.061,
+            "unit": "founder records"
+          }
+        ],
+        "schoolSuppressedCells": 9,
+        "leadGender": {
+          "reportedN": 55,
+          "problemN": 55,
+          "reportingCoverage": 1.0,
+          "groups": [
+            {
+              "label": "Female",
+              "n": 16,
+              "shareAmongReported": 0.2909
+            },
+            {
+              "label": "Male",
+              "n": 34,
+              "shareAmongReported": 0.6182
+            }
+          ],
+          "evaluation": {
+            "available": true,
+            "differenceLabel": "Evaluation difference within this problem",
+            "adjustedDifferenceFemaleMinusMale": -0.2033,
+            "adjustedDifferenceCiLow": -0.4844,
+            "adjustedDifferenceCiHigh": 0.097,
+            "groups": [
+              {
+                "label": "Female",
+                "n": 16,
+                "rawMean": 3.2265,
+                "rawCiLow": 2.9683,
+                "rawCiHigh": 3.4694,
+                "adjustedMean": -0.1062,
+                "adjustedCiLow": -0.3562,
+                "adjustedCiHigh": 0.1243
+              },
+              {
+                "label": "Male",
+                "n": 34,
+                "rawMean": 3.4194,
+                "rawCiLow": 3.2594,
+                "rawCiHigh": 3.5704,
+                "adjustedMean": 0.0971,
+                "adjustedCiLow": -0.056,
+                "adjustedCiHigh": 0.2502
+              }
+            ]
+          }
+        },
+        "support": {
+          "n": 55,
+          "problem": 3.8161,
+          "business": 2.9732,
+          "gap": 0.8429,
+          "observed": "Problem & Customer Definition is higher than Business Model in historical application ratings.",
+          "theme": "Care pathways / payer and caregiver discovery",
+          "question": "Could shared access to care-delivery partners help teams test where they fit in patient and caregiver journeys, and who pays?",
+          "validation": "Ask founders whether pathway fit, reimbursement, clinical evidence, caregiver adoption, or another constraint is most important.",
+          "interpretation": "Proposed interpretation to validate; not a measured intervention effect."
+        }
+      },
+      {
+        "id": 14,
+        "label": "Organizational workflow and team coordination",
+        "description": "Operational teams struggle with fragmented data, repetitive work, coordination, and timely decision-making.",
+        "n": 43,
+        "share": 0.0937,
+        "tracks": {
+          "Open": {
+            "suppressed": false,
+            "n": 34,
+            "share": 0.1838
+          },
+          "Social Impact": {
+            "suppressed": true
+          },
+          "Health & Life Sciences": {
+            "suppressed": true
+          }
+        },
+        "years": [
+          {
+            "year": 2021,
+            "coverage": "partial",
+            "coverageLabel": "Partial problem-text coverage",
+            "suppressed": true
+          },
+          {
+            "year": 2022,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 12,
+            "share": 0.087
+          },
+          {
+            "year": 2023,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 14,
+            "share": 0.1111
+          },
+          {
+            "year": 2024,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 16,
+            "share": 0.1203
+          }
+        ],
+        "schools": [
+          {
+            "label": "Non-Harvard affiliate",
+            "n": 38,
+            "share": 0.3333,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Business School",
+            "n": 30,
+            "share": 0.2632,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard College",
+            "n": 16,
+            "share": 0.1404,
+            "unit": "founder records"
+          }
+        ],
+        "schoolSuppressedCells": 11,
+        "leadGender": {
+          "reportedN": 43,
+          "problemN": 43,
+          "reportingCoverage": 1.0,
+          "groups": [
+            {
+              "label": "Female",
+              "n": 14,
+              "shareAmongReported": 0.3256
+            },
+            {
+              "label": "Male",
+              "n": 29,
+              "shareAmongReported": 0.6744
+            }
+          ],
+          "evaluation": {
+            "available": true,
+            "differenceLabel": "Evaluation difference within this problem",
+            "adjustedDifferenceFemaleMinusMale": -0.1302,
+            "adjustedDifferenceCiLow": -0.4645,
+            "adjustedDifferenceCiHigh": 0.1582,
+            "groups": [
+              {
+                "label": "Female",
+                "n": 14,
+                "rawMean": 3.2401,
+                "rawCiLow": 2.9875,
+                "rawCiHigh": 3.4843,
+                "adjustedMean": -0.1034,
+                "adjustedCiLow": -0.3573,
+                "adjustedCiHigh": 0.1345
+              },
+              {
+                "label": "Male",
+                "n": 29,
+                "rawMean": 3.3821,
+                "rawCiLow": 3.2243,
+                "rawCiHigh": 3.5547,
+                "adjustedMean": 0.0268,
+                "adjustedCiLow": -0.1336,
+                "adjustedCiHigh": 0.205
+              }
+            ]
+          }
+        },
+        "support": {
+          "n": 43,
+          "problem": 3.7912,
+          "business": 3.0264,
+          "gap": 0.7648,
+          "observed": "Problem & Customer Definition is higher than Business Model in historical application ratings.",
+          "theme": "Workflow discovery / design partners",
+          "question": "Could structured design-partner sessions help teams test how a proposed change fits existing workflows, budget ownership, and adoption?",
+          "validation": "Ask founders and operators whether workflow access, integration, change management, or buyer clarity is the binding constraint.",
+          "interpretation": "Proposed interpretation to validate; not a measured intervention effect."
+        }
+      },
+      {
+        "id": 8,
+        "label": "Safer clinical procedures and hospital care",
+        "description": "Patients and clinical teams face avoidable risks, complications, delays, and burdens around procedures and hospital care.",
+        "n": 37,
+        "share": 0.0806,
+        "tracks": {
+          "Open": {
+            "suppressed": true
+          },
+          "Social Impact": {
+            "suppressed": true
+          },
+          "Health & Life Sciences": {
+            "suppressed": false,
+            "n": 30,
+            "share": 0.3061
+          }
+        },
+        "years": [
+          {
+            "year": 2021,
+            "coverage": "partial",
+            "coverageLabel": "Partial problem-text coverage",
+            "suppressed": false,
+            "n": 10,
+            "share": 0.1613
+          },
+          {
+            "year": 2022,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": true
+          },
+          {
+            "year": 2023,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": true
+          },
+          {
+            "year": 2024,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": true
+          }
+        ],
+        "schools": [
+          {
+            "label": "Harvard Medical School",
+            "n": 42,
+            "share": 0.359,
+            "unit": "founder records"
+          },
+          {
+            "label": "Non-Harvard affiliate",
+            "n": 31,
+            "share": 0.265,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Business School",
+            "n": 11,
+            "share": 0.094,
+            "unit": "founder records"
+          }
+        ],
+        "schoolSuppressedCells": 9,
+        "leadGender": {
+          "reportedN": 36,
+          "problemN": 37,
+          "reportingCoverage": 0.973,
+          "groups": [
+            {
+              "label": "Female",
+              "n": 13,
+              "shareAmongReported": 0.3611
+            },
+            {
+              "label": "Male",
+              "n": 21,
+              "shareAmongReported": 0.5833
+            }
+          ],
+          "evaluation": {
+            "available": true,
+            "differenceLabel": "Evaluation difference within this problem",
+            "adjustedDifferenceFemaleMinusMale": 0.3075,
+            "adjustedDifferenceCiLow": -0.0248,
+            "adjustedDifferenceCiHigh": 0.6475,
+            "groups": [
+              {
+                "label": "Female",
+                "n": 13,
+                "rawMean": 3.4748,
+                "rawCiLow": 3.2053,
+                "rawCiHigh": 3.7177,
+                "adjustedMean": 0.1728,
+                "adjustedCiLow": -0.0833,
+                "adjustedCiHigh": 0.4329
+              },
+              {
+                "label": "Male",
+                "n": 21,
+                "rawMean": 3.1481,
+                "rawCiLow": 2.8993,
+                "rawCiHigh": 3.3909,
+                "adjustedMean": -0.1347,
+                "adjustedCiLow": -0.3569,
+                "adjustedCiHigh": 0.0947
+              }
+            ]
+          }
+        },
+        "support": {
+          "n": 37,
+          "problem": 3.697,
+          "business": 2.8511,
+          "gap": 0.8459,
+          "observed": "Problem & Customer Definition is higher than Business Model in historical application ratings.",
+          "theme": "Clinical pathways / hospital partners",
+          "question": "Could shared clinical and hospital-partner sessions help teams test an adoption pathway?",
+          "validation": "Ask teams and clinical partners whether workflow fit, evidence, procurement, or another constraint is most important.",
+          "interpretation": "Proposed interpretation to validate; not a measured intervention effect."
+        }
+      },
+      {
+        "id": 11,
+        "label": "Climate-smart production and decarbonization",
+        "description": "Agriculture and industrial systems struggle to reduce emissions, resource use, waste, and climate exposure while maintaining output.",
+        "n": 37,
+        "share": 0.0806,
+        "tracks": {
+          "Open": {
+            "suppressed": false,
+            "n": 16,
+            "share": 0.0865
+          },
+          "Social Impact": {
+            "suppressed": false,
+            "n": 16,
+            "share": 0.0909
+          },
+          "Health & Life Sciences": {
+            "suppressed": true
+          }
+        },
+        "years": [
+          {
+            "year": 2021,
+            "coverage": "partial",
+            "coverageLabel": "Partial problem-text coverage",
+            "suppressed": true
+          },
+          {
+            "year": 2022,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 13,
+            "share": 0.0942
+          },
+          {
+            "year": 2023,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 11,
+            "share": 0.0873
+          },
+          {
+            "year": 2024,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": true
+          }
+        ],
+        "schools": [
+          {
+            "label": "Non-Harvard affiliate",
+            "n": 52,
+            "share": 0.4522,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Business School",
+            "n": 16,
+            "share": 0.1391,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Kennedy School",
+            "n": 10,
+            "share": 0.087,
+            "unit": "founder records"
+          }
+        ],
+        "schoolSuppressedCells": 10,
+        "leadGender": {
+          "reportedN": 37,
+          "problemN": 37,
+          "reportingCoverage": 1.0,
+          "groups": [
+            {
+              "label": "Female",
+              "n": 12,
+              "shareAmongReported": 0.3243
+            },
+            {
+              "label": "Male",
+              "n": 23,
+              "shareAmongReported": 0.6216
+            }
+          ],
+          "evaluation": {
+            "available": true,
+            "differenceLabel": "Evaluation difference within this problem",
+            "adjustedDifferenceFemaleMinusMale": 0.1215,
+            "adjustedDifferenceCiLow": -0.2917,
+            "adjustedDifferenceCiHigh": 0.4724,
+            "groups": [
+              {
+                "label": "Female",
+                "n": 12,
+                "rawMean": 3.4622,
+                "rawCiLow": 3.1748,
+                "rawCiHigh": 3.7375,
+                "adjustedMean": 0.1391,
+                "adjustedCiLow": -0.1586,
+                "adjustedCiHigh": 0.405
+              },
+              {
+                "label": "Male",
+                "n": 23,
+                "rawMean": 3.4052,
+                "rawCiLow": 3.1585,
+                "rawCiHigh": 3.6437,
+                "adjustedMean": 0.0175,
+                "adjustedCiLow": -0.2296,
+                "adjustedCiHigh": 0.2576
+              }
+            ]
+          }
+        },
+        "support": {
+          "n": 37,
+          "problem": 3.8464,
+          "business": 2.8992,
+          "gap": 0.9472,
+          "observed": "Problem & Customer Definition is higher than Business Model in historical application ratings.",
+          "theme": "Deployment partners / operating economics",
+          "question": "Could shared introductions to deployment partners help teams test adoption and operating economics?",
+          "validation": "Ask founders whether partner access, unit economics, project finance, or regulation is the main constraint.",
+          "interpretation": "Proposed interpretation to validate; not a measured intervention effect."
+        }
+      },
+      {
+        "id": 5,
+        "label": "Workforce access, hiring, and career mobility",
+        "description": "Job seekers and employers struggle to connect, build inclusive pipelines, hire effectively, and sustain a healthy workforce.",
+        "n": 32,
+        "share": 0.0697,
+        "tracks": {
+          "Open": {
+            "suppressed": false,
+            "n": 12,
+            "share": 0.0649
+          },
+          "Social Impact": {
+            "suppressed": false,
+            "n": 19,
+            "share": 0.108
+          },
+          "Health & Life Sciences": {
+            "suppressed": true
+          }
+        },
+        "years": [
+          {
+            "year": 2021,
+            "coverage": "partial",
+            "coverageLabel": "Partial problem-text coverage",
+            "suppressed": true
+          },
+          {
+            "year": 2022,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": true
+          },
+          {
+            "year": 2023,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": false,
+            "n": 13,
+            "share": 0.1032
+          },
+          {
+            "year": 2024,
+            "coverage": "complete",
+            "coverageLabel": "Complete/near-complete problem-text coverage",
+            "suppressed": true
+          }
+        ],
+        "schools": [
+          {
+            "label": "Non-Harvard affiliate",
+            "n": 30,
+            "share": 0.3371,
+            "unit": "founder records"
+          },
+          {
+            "label": "Harvard Business School",
+            "n": 21,
+            "share": 0.236,
+            "unit": "founder records"
+          }
+        ],
+        "schoolSuppressedCells": 9,
+        "leadGender": {
+          "reportedN": 32,
+          "problemN": 32,
+          "reportingCoverage": 1.0,
+          "groups": [
+            {
+              "label": "Female",
+              "n": 16,
+              "shareAmongReported": 0.5
+            },
+            {
+              "label": "Male",
+              "n": 16,
+              "shareAmongReported": 0.5
+            }
+          ],
+          "evaluation": {
+            "available": true,
+            "differenceLabel": "Evaluation difference within this problem",
+            "adjustedDifferenceFemaleMinusMale": -0.2769,
+            "adjustedDifferenceCiLow": -0.6814,
+            "adjustedDifferenceCiHigh": 0.1395,
+            "groups": [
+              {
+                "label": "Female",
+                "n": 16,
+                "rawMean": 3.3235,
+                "rawCiLow": 2.9463,
+                "rawCiHigh": 3.6926,
+                "adjustedMean": -0.0459,
+                "adjustedCiLow": -0.4022,
+                "adjustedCiHigh": 0.2925
+              },
+              {
+                "label": "Male",
+                "n": 16,
+                "rawMean": 3.6319,
+                "rawCiLow": 3.4157,
+                "rawCiHigh": 3.8554,
+                "adjustedMean": 0.231,
+                "adjustedCiLow": 0.0251,
+                "adjustedCiHigh": 0.4537
+              }
+            ]
+          }
+        },
+        "support": {
+          "n": 32,
+          "problem": 3.9421,
+          "business": 3.0284,
+          "gap": 0.9137,
+          "observed": "Problem & Customer Definition is higher than Business Model in historical application ratings.",
+          "theme": "Employer discovery / workforce pilots",
+          "question": "Could shared employer and workforce-partner sessions help teams test who owns the budget, what adoption requires, and what makes a pilot credible?",
+          "validation": "Ask founders whether employer access, budget ownership, or evidence for a pilot is actually the binding constraint.",
+          "interpretation": "Proposed interpretation to validate; not a measured intervention effect."
+        }
+      }
+    ],
+    "narrative": "The same underlying customer problems recur across PIC tracks, cohorts, Harvard communities, and applicant groups."
+  },
   "coverage": {
     "yearTrack": [
       {

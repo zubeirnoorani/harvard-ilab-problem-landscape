@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.stats import linregress
+import statsmodels.formula.api as smf
 
 from .config import PATHS, RANDOM_SEED, RATING_COLUMNS, VALID_YEARS
 
@@ -31,6 +32,25 @@ def bootstrap_mean_ci(
     rng = np.random.default_rng(seed)
     samples = rng.choice(clean, size=(iterations, len(clean)), replace=True).mean(axis=1)
     low, high = np.quantile(samples, [0.025, 0.975])
+    return float(low), float(high)
+
+
+def bootstrap_difference_ci(
+    first: pd.Series | np.ndarray,
+    second: pd.Series | np.ndarray,
+    *,
+    seed: int = RANDOM_SEED,
+    iterations: int = BOOTSTRAP_ITERATIONS,
+) -> tuple[float, float]:
+    """Percentile bootstrap interval for a difference in application-level means."""
+    first_clean = pd.to_numeric(pd.Series(first), errors="coerce").dropna().to_numpy(dtype=float)
+    second_clean = pd.to_numeric(pd.Series(second), errors="coerce").dropna().to_numpy(dtype=float)
+    if not len(first_clean) or not len(second_clean):
+        return np.nan, np.nan
+    rng = np.random.default_rng(seed)
+    first_samples = rng.choice(first_clean, size=(iterations, len(first_clean)), replace=True).mean(axis=1)
+    second_samples = rng.choice(second_clean, size=(iterations, len(second_clean)), replace=True).mean(axis=1)
+    low, high = np.quantile(first_samples - second_samples, [0.025, 0.975])
     return float(low), float(high)
 
 
@@ -395,6 +415,232 @@ def lead_gender_composition(primary: pd.DataFrame, m_concepts: int) -> pd.DataFr
     return rows
 
 
+def gender_problem_evaluation(
+    primary: pd.DataFrame,
+    *,
+    min_cell: int = 10,
+    seed: int = RANDOM_SEED,
+    iterations: int = BOOTSTRAP_ITERATIONS,
+) -> tuple[dict[str, object], pd.DataFrame]:
+    """Describe lead-gender evaluation patterns at the application level.
+
+    The pooled coefficient adjusts for problem fixed effects and year-by-track
+    fixed effects. Problem-specific rows are published only when both the
+    female- and male-led cells meet ``min_cell``. No gender is inferred.
+    """
+    required = {
+        "application_id",
+        "year",
+        "Track",
+        "concept_id",
+        "concept_label",
+        "Gender",
+        "recommendation_mean",
+        "recommendation_adjusted_year_track",
+    }
+    missing = required.difference(primary.columns)
+    if missing:
+        raise ValueError(f"Missing columns for gender evaluation: {sorted(missing)}")
+
+    data = primary[list(required)].copy()
+    data["lead_gender"] = data["Gender"].fillna("").astype(str).str.strip()
+    data["gender_key"] = data["lead_gender"].str.casefold()
+    data = data.loc[data["gender_key"].isin({"female", "male"})].copy()
+    data["female_lead"] = data["gender_key"].eq("female").astype(int)
+    data["recommendation_mean"] = pd.to_numeric(data["recommendation_mean"], errors="coerce")
+    data["recommendation_adjusted_year_track"] = pd.to_numeric(
+        data["recommendation_adjusted_year_track"], errors="coerce"
+    )
+    data["year_track"] = data["year"].astype(str) + " × " + data["Track"].astype(str)
+
+    model_data = data.dropna(subset=["recommendation_mean"]).copy()
+    fitted = smf.ols(
+        "recommendation_mean ~ female_lead + C(concept_id) + C(year_track)",
+        data=model_data,
+    ).fit(cov_type="HC3")
+    coefficient = float(fitted.params["female_lead"])
+    ci = fitted.conf_int().loc["female_lead"]
+
+    all_gender = primary["Gender"].fillna("").astype(str).str.strip().str.casefold()
+    female_total = int(all_gender.eq("female").sum())
+    male_total = int(all_gender.eq("male").sum())
+    total_applications = int(primary["application_id"].nunique())
+    reported_total = int(all_gender.ne("").sum())
+
+    overall_groups: dict[str, dict[str, float | int]] = {}
+    for label, key in (("Female", "female"), ("Male", "male")):
+        group = data.loc[data["gender_key"].eq(key)]
+        raw_low, raw_high = bootstrap_mean_ci(
+            group["recommendation_mean"], seed=seed + (1 if key == "female" else 2), iterations=iterations
+        )
+        adjusted_low, adjusted_high = bootstrap_mean_ci(
+            group["recommendation_adjusted_year_track"],
+            seed=seed + (3 if key == "female" else 4),
+            iterations=iterations,
+        )
+        overall_groups[label] = {
+            "n": int(group["application_id"].nunique()),
+            "raw_mean": float(group["recommendation_mean"].mean()),
+            "raw_ci_low": raw_low,
+            "raw_ci_high": raw_high,
+            "adjusted_mean": float(group["recommendation_adjusted_year_track"].mean()),
+            "adjusted_ci_low": adjusted_low,
+            "adjusted_ci_high": adjusted_high,
+        }
+
+    rows: list[dict[str, object]] = []
+    for (concept_id, concept_label), group in data.groupby(["concept_id", "concept_label"], sort=False):
+        female = group.loc[group["gender_key"].eq("female")]
+        male = group.loc[group["gender_key"].eq("male")]
+        female_n = int(female["application_id"].nunique())
+        male_n = int(male["application_id"].nunique())
+        publishable = female_n >= min_cell and male_n >= min_cell
+        row: dict[str, object] = {
+            "concept_id": int(concept_id),
+            "concept_label": str(concept_label),
+            "comparison_publishable": publishable,
+        }
+        if publishable:
+            female_raw_ci = bootstrap_mean_ci(
+                female["recommendation_mean"],
+                seed=seed + 100 + int(concept_id) * 10,
+                iterations=iterations,
+            )
+            male_raw_ci = bootstrap_mean_ci(
+                male["recommendation_mean"],
+                seed=seed + 101 + int(concept_id) * 10,
+                iterations=iterations,
+            )
+            female_adjusted_ci = bootstrap_mean_ci(
+                female["recommendation_adjusted_year_track"],
+                seed=seed + 102 + int(concept_id) * 10,
+                iterations=iterations,
+            )
+            male_adjusted_ci = bootstrap_mean_ci(
+                male["recommendation_adjusted_year_track"],
+                seed=seed + 103 + int(concept_id) * 10,
+                iterations=iterations,
+            )
+            difference_ci = bootstrap_difference_ci(
+                female["recommendation_adjusted_year_track"],
+                male["recommendation_adjusted_year_track"],
+                seed=seed + 104 + int(concept_id) * 10,
+                iterations=iterations,
+            )
+            row.update(
+                {
+                    "female_n": female_n,
+                    "male_n": male_n,
+                    "female_raw_mean": float(female["recommendation_mean"].mean()),
+                    "female_raw_ci_low": female_raw_ci[0],
+                    "female_raw_ci_high": female_raw_ci[1],
+                    "male_raw_mean": float(male["recommendation_mean"].mean()),
+                    "male_raw_ci_low": male_raw_ci[0],
+                    "male_raw_ci_high": male_raw_ci[1],
+                    "female_adjusted_mean": float(female["recommendation_adjusted_year_track"].mean()),
+                    "female_adjusted_ci_low": female_adjusted_ci[0],
+                    "female_adjusted_ci_high": female_adjusted_ci[1],
+                    "male_adjusted_mean": float(male["recommendation_adjusted_year_track"].mean()),
+                    "male_adjusted_ci_low": male_adjusted_ci[0],
+                    "male_adjusted_ci_high": male_adjusted_ci[1],
+                    "adjusted_difference_female_minus_male": float(
+                        female["recommendation_adjusted_year_track"].mean()
+                        - male["recommendation_adjusted_year_track"].mean()
+                    ),
+                    "adjusted_difference_ci_low": difference_ci[0],
+                    "adjusted_difference_ci_high": difference_ci[1],
+                }
+            )
+        rows.append(row)
+
+    summary: dict[str, object] = {
+        "total_applications": total_applications,
+        "reported_lead_gender_n": reported_total,
+        "female_n": female_total,
+        "male_n": male_total,
+        "model_n": int(fitted.nobs),
+        "female_coefficient": coefficient,
+        "female_coefficient_ci_low": float(ci.iloc[0]),
+        "female_coefficient_ci_high": float(ci.iloc[1]),
+        "female_coefficient_p_value": float(fitted.pvalues["female_lead"]),
+        "model": "Recommendation ~ female lead + problem fixed effects + year×track fixed effects",
+        "covariance": "HC3 heteroskedasticity-robust",
+        "overall_groups": overall_groups,
+        "minimum_public_cell": min_cell,
+    }
+    return summary, pd.DataFrame(rows).sort_values("concept_id").reset_index(drop=True)
+
+
+def write_gender_problem_evaluation_note(
+    primary: pd.DataFrame,
+    *,
+    output_path: Path | None = None,
+    min_cell: int = 10,
+) -> tuple[dict[str, object], pd.DataFrame]:
+    """Write the meeting backup note and its local analytical table."""
+    summary, table = gender_problem_evaluation(primary, min_cell=min_cell)
+    table.to_csv(PATHS.tables / "gender_problem_evaluation_m16.csv", index=False)
+    output_path = output_path or (PATHS.outputs / "GENDER_PROBLEM_EVALUATION_NOTE.md")
+    publishable = table.loc[table["comparison_publishable"].astype(bool)].copy()
+    lines = [
+        "# Lead-applicant gender × problem evaluation note",
+        "",
+        "## Meeting question",
+        "",
+        "Within the same underlying customer problems, do applications led by women appear to receive different Recommendation ratings? This is a descriptive application-level comparison, not evidence of a gender effect or any causal mechanism.",
+        "",
+        "## Coverage",
+        "",
+        f"- Applications with usable problem text: **{summary['total_applications']}**",
+        f"- Female lead applicant: **N={summary['female_n']}**",
+        f"- Male lead applicant: **N={summary['male_n']}**",
+        f"- Any supplied lead-gender response: **N={summary['reported_lead_gender_n']}**",
+        "- Other supplied response categories and nonresponse are not broken out because the category cells are below the public disclosure threshold.",
+        "",
+        "## Adjusted portfolio-wide result",
+        "",
+        (
+            f"The female-lead coefficient is **{summary['female_coefficient']:+.2f} Recommendation points** "
+            f"(HC3 95% CI **{summary['female_coefficient_ci_low']:+.2f} to "
+            f"{summary['female_coefficient_ci_high']:+.2f}**, N={summary['model_n']} applications) in:"
+        ),
+        "",
+        f"`{summary['model']}`",
+        "",
+        "The interval should be read as uncertainty around an observational association. It does not isolate a gender effect and may reflect applicant, judge, cohort, selection, or other composition differences.",
+        "",
+        "## Problem-specific descriptive comparisons",
+        "",
+        "Only concepts with at least 10 female-led and 10 male-led applications are shown. Adjusted values are application Recommendation centered within year × track; confidence intervals use a fixed-seed application-level percentile bootstrap.",
+        "",
+        "| Problem area | Female N | Male N | Female raw | Male raw | Female adjusted | Male adjusted | Adjusted difference (F−M) | 95% CI |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for _, row in publishable.sort_values("concept_label").iterrows():
+        lines.append(
+            f"| {row['concept_label']} | {int(row['female_n'])} | {int(row['male_n'])} | "
+            f"{row['female_raw_mean']:.2f} | {row['male_raw_mean']:.2f} | "
+            f"{row['female_adjusted_mean']:+.2f} | {row['male_adjusted_mean']:+.2f} | "
+            f"{row['adjusted_difference_female_minus_male']:+.2f} | "
+            f"{row['adjusted_difference_ci_low']:+.2f} to {row['adjusted_difference_ci_high']:+.2f} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Interpretation cautions",
+            "",
+            "- The supplied application-level Gender field is used; gender is never inferred from names.",
+            "- The model adjusts for observed problem area and year × track, but not judge assignment, team composition, venture maturity, application quality, selection, or other unobserved differences.",
+            "- Recommendation is a judging score, not a funding or venture-outcome measure.",
+            "- Problem-specific comparisons are exploratory. Multiple comparisons and modest cell sizes make interaction estimates unstable.",
+            "- Suppressed problem cells should be discussed qualitatively only after appropriate confidential review.",
+            "",
+        ]
+    )
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    return summary, table
+
+
 def team_gender_composition(founder: pd.DataFrame, m_concepts: int) -> pd.DataFrame:
     """Reported lead-and-team gender records with explicit coverage denominators."""
     data = founder.copy()
@@ -667,6 +913,9 @@ def run_analysis(m_concepts: int) -> dict[str, pd.DataFrame | dict[str, object]]
         table.to_csv(PATHS.tables / f"{name}_m{m_concepts}.csv", index=False)
     for name, table in composition.items():
         table.to_csv(PATHS.tables / f"composition_{name.replace(' ', '_')}_m{m_concepts}.csv", index=False)
+
+    if m_concepts == 16:
+        write_gender_problem_evaluation_note(primary)
 
     overlap = pd.read_csv(PATHS.tables / f"concept_overlap_m{m_concepts}.csv")
     stability = pd.read_csv(PATHS.tables / f"concept_stability_m{m_concepts}.csv")

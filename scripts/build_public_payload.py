@@ -34,6 +34,41 @@ SCOPE_MAP: dict[str, tuple[str, str | None, str]] = {
     "Health & Life Sciences": ("Track", "Health & Life Science", "Health & Life Science"),
 }
 
+MEETING_TRACKS = ("Open", "Social Impact", "Health & Life Sciences")
+DEFAULT_MEETING_PROBLEM = "Equitable K–12 learning and student support"
+SUPPORT_HYPOTHESES: dict[int, dict[str, str]] = {
+    5: {
+        "theme": "Employer discovery / workforce pilots",
+        "question": "Could shared employer and workforce-partner sessions help teams test who owns the budget, what adoption requires, and what makes a pilot credible?",
+        "validation": "Ask founders whether employer access, budget ownership, or evidence for a pilot is actually the binding constraint.",
+    },
+    7: {
+        "theme": "Buyer discovery / pilot partnerships",
+        "question": "Could shared buyer-discovery and pilot-partner access help education teams test who buys, how procurement works, and what a useful pilot looks like?",
+        "validation": "Ask founders whether buyer access and procurement are actually the binding constraints.",
+    },
+    8: {
+        "theme": "Clinical pathways / hospital partners",
+        "question": "Could shared clinical and hospital-partner sessions help teams test an adoption pathway?",
+        "validation": "Ask teams and clinical partners whether workflow fit, evidence, procurement, or another constraint is most important.",
+    },
+    11: {
+        "theme": "Deployment partners / operating economics",
+        "question": "Could shared introductions to deployment partners help teams test adoption and operating economics?",
+        "validation": "Ask founders whether partner access, unit economics, project finance, or regulation is the main constraint.",
+    },
+    14: {
+        "theme": "Workflow discovery / design partners",
+        "question": "Could structured design-partner sessions help teams test how a proposed change fits existing workflows, budget ownership, and adoption?",
+        "validation": "Ask founders and operators whether workflow access, integration, change management, or buyer clarity is the binding constraint.",
+    },
+    15: {
+        "theme": "Care pathways / payer and caregiver discovery",
+        "question": "Could shared access to care-delivery partners help teams test where they fit in patient and caregiver journeys, and who pays?",
+        "validation": "Ask founders whether pathway fit, reimbursement, clinical evidence, caregiver adoption, or another constraint is most important.",
+    },
+}
+
 
 def clean_number(value: object, digits: int = 4) -> float | int | None:
     if pd.isna(value):
@@ -501,6 +536,180 @@ def build_support_portfolio(m: int) -> list[dict[str, Any]]:
     ]
 
 
+def build_meeting_view(leadership: dict[str, Any]) -> dict[str, Any]:
+    """Build the fixed M=16, primary-assignment narrative used in the meeting."""
+    primary = leadership["slices"]["primary"]["All tracks"]["All years"]["items"]
+    shared = sorted(primary, key=lambda item: item["n"], reverse=True)[:6]
+    shared_ids = {int(item["id"]) for item in shared}
+    concepts = {int(item["id"]): item for item in leadership["concepts"]}
+    tracks = pd.read_csv(TABLES / "track_overrepresentation_m16.csv")
+    trends = pd.read_csv(TABLES / "trends_m16.csv")
+    schools = pd.read_csv(TABLES / "composition_harvard_school_m16.csv")
+    lead_gender = pd.read_csv(TABLES / "lead_gender_composition_m16.csv")
+    gender_evaluation = pd.read_csv(TABLES / "gender_problem_evaluation_m16.csv")
+
+    track_name = {
+        "Open": "Open",
+        "Social Impact": "Social Impact",
+        "Health & Life Science": "Health & Life Sciences",
+    }
+    track_denominators = {
+        track_name[str(row["Track"])]: int(row["track_n_applications"])
+        for _, row in tracks.drop_duplicates("Track").iterrows()
+    }
+    records: list[dict[str, Any]] = []
+    for item in shared:
+        cid = int(item["id"])
+        meta = concepts[cid]
+        profile = leadership["profiles"][str(cid)]
+
+        track_cells: dict[str, dict[str, Any]] = {}
+        for raw, display in track_name.items():
+            row = tracks.loc[tracks["concept_id"].eq(cid) & tracks["Track"].eq(raw)].iloc[0]
+            n = int(row["n_applications"])
+            track_cells[display] = (
+                {
+                    "suppressed": False,
+                    "n": n,
+                    "share": clean_number(row["track_share"]),
+                }
+                if n >= MIN_CELL
+                else {"suppressed": True}
+            )
+
+        trend = trends.loc[trends["track_scope"].eq("All tracks") & trends["concept_id"].eq(cid)].iloc[0]
+        year_cells: list[dict[str, Any]] = []
+        for year in YEARS:
+            n = int(trend[f"count_{year}"])
+            year_cells.append(
+                {
+                    "year": year,
+                    "coverage": "partial" if year == 2021 else "complete",
+                    "coverageLabel": "Partial problem-text coverage" if year == 2021 else "Complete/near-complete problem-text coverage",
+                    **(
+                        {"suppressed": False, "n": n, "share": clean_number(trend[f"share_{year}"])}
+                        if n >= MIN_CELL
+                        else {"suppressed": True}
+                    ),
+                }
+            )
+
+        school_rows = schools.loc[
+            schools["concept_id"].eq(cid) & schools["n_founders"].ge(MIN_CELL)
+        ].sort_values("n_founders", ascending=False)
+        school_cells = [
+            {
+                "label": clean_label(row["harvard_school"]),
+                "n": int(row["n_founders"]),
+                "share": clean_number(row["share_within_problem"]),
+                "unit": "founder records",
+            }
+            for _, row in school_rows.iterrows()
+        ]
+
+        lead_rows = lead_gender.loc[lead_gender["concept_id"].eq(cid)].copy()
+        reported_n = int(lead_rows["reported_lead_gender_n"].iloc[0])
+        problem_n = int(lead_rows["problem_n_applications"].iloc[0])
+        gender_cells: list[dict[str, Any]] = []
+        for label in ("Female", "Male"):
+            row = lead_rows.loc[lead_rows["lead_gender"].astype(str).str.casefold().eq(label.casefold())]
+            if not row.empty and int(row.iloc[0]["n_applications"]) >= MIN_CELL:
+                gender_cells.append(
+                    {
+                        "label": label,
+                        "n": int(row.iloc[0]["n_applications"]),
+                        "shareAmongReported": clean_number(row.iloc[0]["share_among_reported"]),
+                    }
+                )
+
+        evaluation_row = gender_evaluation.loc[gender_evaluation["concept_id"].eq(cid)]
+        evaluation: dict[str, Any]
+        if not evaluation_row.empty and bool(evaluation_row.iloc[0]["comparison_publishable"]):
+            row = evaluation_row.iloc[0]
+            evaluation = {
+                "available": True,
+                "differenceLabel": "Evaluation difference within this problem",
+                "adjustedDifferenceFemaleMinusMale": clean_number(row["adjusted_difference_female_minus_male"]),
+                "adjustedDifferenceCiLow": clean_number(row["adjusted_difference_ci_low"]),
+                "adjustedDifferenceCiHigh": clean_number(row["adjusted_difference_ci_high"]),
+                "groups": [
+                    {
+                        "label": "Female",
+                        "n": int(row["female_n"]),
+                        "rawMean": clean_number(row["female_raw_mean"]),
+                        "rawCiLow": clean_number(row["female_raw_ci_low"]),
+                        "rawCiHigh": clean_number(row["female_raw_ci_high"]),
+                        "adjustedMean": clean_number(row["female_adjusted_mean"]),
+                        "adjustedCiLow": clean_number(row["female_adjusted_ci_low"]),
+                        "adjustedCiHigh": clean_number(row["female_adjusted_ci_high"]),
+                    },
+                    {
+                        "label": "Male",
+                        "n": int(row["male_n"]),
+                        "rawMean": clean_number(row["male_raw_mean"]),
+                        "rawCiLow": clean_number(row["male_raw_ci_low"]),
+                        "rawCiHigh": clean_number(row["male_raw_ci_high"]),
+                        "adjustedMean": clean_number(row["male_adjusted_mean"]),
+                        "adjustedCiLow": clean_number(row["male_adjusted_ci_low"]),
+                        "adjustedCiHigh": clean_number(row["male_adjusted_ci_high"]),
+                    },
+                ],
+            }
+        else:
+            evaluation = {
+                "available": False,
+                "suppressed": True,
+                "message": "Comparison suppressed because at least one lead-gender cell has fewer than 10 applications.",
+            }
+
+        support = profile["support"]
+        hypothesis = SUPPORT_HYPOTHESES[cid]
+        records.append(
+            {
+                "id": cid,
+                "label": str(item["label"]),
+                "description": str(meta["description"]),
+                "n": int(item["n"]),
+                "share": clean_number(item["share"]),
+                "tracks": track_cells,
+                "years": year_cells,
+                "schools": school_cells,
+                "schoolSuppressedCells": int((schools.loc[schools["concept_id"].eq(cid), "n_founders"] < MIN_CELL).sum()),
+                "leadGender": {
+                    "reportedN": reported_n,
+                    "problemN": problem_n,
+                    "reportingCoverage": clean_number(reported_n / problem_n if problem_n else np.nan),
+                    "groups": gender_cells,
+                    "evaluation": evaluation,
+                },
+                "support": {
+                    "n": int(support["n"]),
+                    "problem": clean_number(support["problem"]),
+                    "business": clean_number(support["business"]),
+                    "gap": clean_number(support["problemMinusBusiness"]),
+                    "observed": "Problem & Customer Definition is higher than Business Model in historical application ratings.",
+                    "theme": hypothesis["theme"],
+                    "question": hypothesis["question"],
+                    "validation": hypothesis["validation"],
+                    "interpretation": "Proposed interpretation to validate; not a measured intervention effect.",
+                },
+            }
+        )
+
+    default_id = next(
+        (record["id"] for record in records if record["label"] == DEFAULT_MEETING_PROBLEM),
+        records[0]["id"],
+    )
+    return {
+        "taxonomy": "M=16 primary assignment",
+        "defaultProblemId": default_id,
+        "fullAtlasRoute": "/atlas",
+        "trackDenominators": track_denominators,
+        "problems": records,
+        "narrative": "The same underlying customer problems recur across PIC tracks, cohorts, Harvard communities, and applicant groups.",
+    }
+
+
 def build_model(m: int, summary: pd.Series) -> dict[str, Any]:
     concepts = build_concepts(m)
     outcomes = pd.read_csv(TABLES / f"concept_outcomes_m{m}.csv")
@@ -643,6 +852,7 @@ def build() -> dict[str, Any]:
             "bootstrap": {"method": "application-level percentile bootstrap", "iterations": 2000, "seed": 42, "confidence": 0.95},
         },
         "models": models,
+        "meeting": build_meeting_view(leadership),
         "coverage": build_coverage(),
         "findings": [
             {

@@ -17,7 +17,7 @@ Place the supplied export at `data/merged_clean.csv`. That path is ignored by Gi
 5. Review every feature's strongest and moderate activators before marking it leadership-ready.
 6. Center each application’s Recommendation within its year and track, then aggregate raw and adjusted outcomes with application-level bootstrap confidence intervals.
 7. Overlay 2022–2024 trends, disagreement, founder-support rubric gaps, track over-indexing, lead/team gender, normalized school representation, geography, and industry.
-8. Generate figures, problem profiles, meeting findings, and the Streamlit prototype.
+8. Generate figures, problem profiles, a lead-gender evaluation backup note, meeting findings, and the Streamlit prototype.
 
 The default leadership taxonomy is M=16 with primary assignment. M=32 is retained as a detailed/exploratory view, and full overlapping SAE membership remains available in the analytical tables.
 
@@ -54,11 +54,17 @@ The notebooks are thin, inspectable companions to the source modules rather than
 
 ## Hosted aggregate prototype
 
-The disclosure-controlled leadership view is deployed at:
+The disclosure-controlled, three-step meeting experience is the default route:
 
 <https://harvard-ilab-problem-landscape.vercel.app>
 
-The hosted decision-support prototype includes an executive leadership summary, 2022–2024 attention trends, raw and year×track-adjusted Recommendation, application-level bootstrap intervals, a portfolio-wide “Where can i-lab help?” view, actionable signals, track signatures, lead-applicant and team-reported gender views, normalized school representation, judge disagreement, concept quality badges, and drill-down Problem Profiles. It contains aggregate cells only and suppresses cells below 10 observations. It does not publish application text, venture names, application IDs, row-level founder attributes, embeddings, activations, or checkpoints. Rebuild its payload after regenerating the analytical outputs with:
+It guides a 30-minute conversation through exactly three views: shared problems across tracks, one selected problem across years/tracks/schools/lead-applicant gender, and rubric gaps translated into support questions to validate. The meeting taxonomy is fixed at M=16 primary assignment. “Equitable K–12 learning and student support” is the default walkthrough because it is the largest primary area and has publishable cross-year, cross-track, school, and lead-gender cells.
+
+The full research atlas remains available at:
+
+<https://harvard-ilab-problem-landscape.vercel.app/atlas>
+
+The atlas preserves M=16/M=32, primary/overlapping membership, adjusted Recommendation, 2022–2024 trends, judge disagreement, track over-indexing, lead/team gender, normalized school representation, methodology, stability diagnostics, and detailed Problem Profiles. Both public views contain aggregate cells only and suppress cells below 10 observations. Neither publishes application text, venture names, application IDs, row-level founder attributes, embeddings, activations, or checkpoints. Rebuild the shared payload after regenerating the analytical outputs with:
 
 ```bash
 .venv/bin/python scripts/build_public_payload.py
@@ -101,6 +107,7 @@ The public repository contains reproducible code, empty notebooks, disclosure-co
 - `outputs/tables/concept_diagnostics_m16.csv` and `concept_diagnostics_m32.csv` — reviewed concepts and examples.
 - `outputs/tables/track_overrepresentation_m16.csv` — track shares, portfolio shares, and relative-concentration ratios.
 - `outputs/tables/lead_gender_composition_m16.csv`, `team_gender_composition_m16.csv`, and `school_representation_m16.csv` — founder representation with explicit coverage/baselines.
+- `outputs/GENDER_PROBLEM_EVALUATION_NOTE.md` — meeting backup on lead-applicant gender and Recommendation, adjusted for problem and year×track with explicit uncertainty and caveats.
 - `outputs/figures/` — interactive and static landscape, trend, evaluation, composition, and intervention views.
 - `outputs/profiles/` — reusable example Problem Profiles.
 - `outputs/FRIDAY_MEETING_FINDINGS.md` — concise leadership discussion findings.
